@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secmlops-collector
+  namespace: secmlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secmlops-collector
+  template:
+    metadata:
+      labels:
+        app: secmlops-collector
+    spec:
+      serviceAccountName: secmlops-collector
+      containers:
+        - name: collector
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install --no-cache-dir kafka-python kubernetes &&
+              python /app/collector.py
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: collector-code
+              mountPath: /app/collector.py
+              subPath: collector.py
+            - name: collector-code
+              mountPath: /app/tetragon_collector.py
+              subPath: tetragon_collector.py
+      volumes:
+        - name: collector-code
+          configMap:
+            name: secmlops-collector-code

@@ -1,0 +1,29 @@
+advertisedHost: neo4j.graph.svc.cluster.local
+
+neo4j:
+  name: secmlops-neo4j
+
+  password: "CHANGE_ME"
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+
+  config:
+    server.memory.heap.initial_size: "256m"
+    server.memory.heap.max_size: "768m"
+    server.memory.pagecache.size: "256m"
+
+  edition: community
+
+  acceptLicenseAgreement: "yes"
+
+volumes:
+  data:
+    mode: dynamic
+    storageClass: local-path
+    size: 5Gi

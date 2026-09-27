@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir kafka-python kubernetes
+
+COPY collector/tetragon_collector.py /app/tetragon_collector.py
+
+CMD ["python", "/app/tetragon_collector.py"]
