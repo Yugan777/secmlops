@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecMLOps — Autonomous Cyber Defense</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #080b10;
+            color: #e8edf5;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .header {
+            padding: 24px 32px;
+            border-bottom: 1px solid #202733;
+            background: #0b0f15;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: #8793a5;
+            font-size: 14px;
+        }
+
+        .container {
+            padding: 24px 32px;
+            max-width: 1600px;
+            margin: auto;
+        }
+
+        .services {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .service,
+        .card {
+            background: #0e131b;
+            border: 1px solid #202733;
+            border-radius: 10px;
+            padding: 18px;
+        }
+
+        .service-name {
+            color: #9ba7b8;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .service-status {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .online {
+            color: #35d07f;
+        }
+
+        .offline {
+            color: #ff5c67;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            min-height: 180px;
+        }
+
+        .full {
+            grid-column: 1 / -1;
+        }
+
+        h2 {
+            margin: 0 0 18px 0;
+            font-size: 17px;
+        }
+
+        .threat-status {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 18px;
+        }
+
+        .status-monitoring {
+            color: #35d07f;
+        }
+
+        .status-threat {
+            color: #ff5c67;
+        }
+
+        .details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+
+        .detail {
+            background: #090d13;
+            border-radius: 7px;
+            padding: 12px;
+        }
+
+        .label {
+            color: #7f8a9b;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .value {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .probabilities {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .prob {
+            background: #090d13;
+            padding: 15px;
+            border-radius: 7px;
+        }
+
+        .prob-value {
+            font-size: 26px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .graph {
+            min-height: 220px;
+            background: #090d13;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #667386;
+        }
+
+        .graph-content {
+            width: 100%;
+        }
+
+        .graph-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .node {
+            border: 1px solid #344052;
+            background: #111722;
+            border-radius: 8px;
+            padding: 12px 16px;
+            text-align: center;
+            min-width: 130px;
+        }
+
+        .arrow {
+            color: #667386;
+            font-size: 20px;
+        }
+
+        .checks {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .check {
+            background: #090d13;
+            padding: 12px;
+            border-radius: 7px;
+            font-size: 13px;
+        }
+
+        .yes {
+            color: #35d07f;
+        }
+
+        .no {
+            color: #7f8a9b;
+        }
+
+        .response {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .response-box {
+            background: #090d13;
+            border-radius: 7px;
+            padding: 14px;
+        }
+
+        .events {
+            max-height: 360px;
+            overflow-y: auto;
+            background: #090d13;
+            border-radius: 8px;
+        }
+
+        .event {
+            padding: 10px 14px;
+            border-bottom: 1px solid #171d27;
+            font-family: monospace;
+            font-size: 12px;
+            color: #b8c2d1;
+        }
+
+        .empty {
+            color: #687487;
+            text-align: center;
+            padding: 50px 20px;
+        }
+
+        @media (max-width: 1000px) {
+            .services {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .response {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .services {
+                grid-template-columns: 1fr;
+            }
+
+            .details,
+            .checks,
+            .response {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 16px;
+            }
+
+            .header {
+                padding: 20px 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="header">
+    <div class="title">SecMLOps — Autonomous Cyber Defense</div>
+    <div class="subtitle">
+        eBPF Telemetry • Temporal Graph Analysis • Context Validation • Controlled Containment
+    </div>
+</header>
+
+<main class="container">
+
+    <!-- SERVICES -->
+    <section class="services">
+
+        <div class="service">
+            <div class="service-name">K3s</div>
+            <div id="k3s-status" class="service-status offline">
+                ● OFFLINE
+            </div>
+        </div>
+
+        <div class="service">
+            <div class="service-name">Tetragon / eBPF</div>
+            <div id="tetragon-status" class="service-status offline">
+                ● OFFLINE
+            </div>
+        </div>
+
+        <div class="service">
+            <div class="service-name">Kafka</div>
+            <div id="kafka-status" class="service-status offline">
+                ● OFFLINE
+            </div>
+        </div>
+
+        <div class="service">
+            <div class="service-name">Neo4j</div>
+            <div id="neo4j-status" class="service-status offline">
+                ● OFFLINE
+            </div>
+        </div>
+
+    </section>
+
+
+    <section class="grid">
+
+        <!-- THREAT STATUS -->
+        <div class="card">
+            <h2>Threat Status</h2>
+
+            <div id="threat-status" class="threat-status status-monitoring">
+                MONITORING
+            </div>
+
+            <div class="details">
+
+                <div class="detail">
+                    <div class="label">Attack Type</div>
+                    <div id="attack-type" class="value">—</div>
+                </div>
+
+                <div class="detail">
+                    <div class="label">Target</div>
+                    <div id="target" class="value">—</div>
+                </div>
+
+                <div class="detail">
+                    <div class="label">Risk Score</div>
+                    <div id="risk-score" class="value">—</div>
+                </div>
+
+                <div class="detail">
+                    <div class="label">Severity</div>
+                    <div id="severity" class="value">—</div>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- GNN -->
+        <div class="card">
+
+            <h2>Temporal GNN</h2>
+
+            <div class="details">
+
+                <div class="detail">
+                    <div class="label">Available</div>
+                    <div id="gnn-available" class="value">✗ NO</div>
+                </div>
+
+                <div class="detail">
+                    <div class="label">Prediction</div>
+                    <div id="gnn-prediction" class="value">BENIGN</div>
+                </div>
+
+            </div>
+
+            <br>
+
+            <div class="probabilities">
+
+                <div class="prob">
+                    <div class="label">Benign Probability</div>
+                    <div id="benign-prob" class="prob-value">0.0000</div>
+                </div>
+
+                <div class="prob">
+                    <div class="label">Suspicious Probability</div>
+                    <div id="suspicious-prob" class="prob-value">0.0000</div>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- GRAPH -->
+        <div class="card full">
+
+            <h2>Temporal Attack Graph</h2>
+
+            <div id="graph" class="graph">
+                <div class="empty">
+                    Waiting for detection...
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- CONTEXT -->
+        <div class="card">
+
+            <h2>Context Validation</h2>
+
+            <div class="checks">
+
+                <div id="same-workload" class="check no">
+                    ✗ Same Workload
+                </div>
+
+                <div id="process-ancestry" class="check no">
+                    ✗ Process Ancestry
+                </div>
+
+                <div id="temporal-proximity" class="check no">
+                    ✗ Temporal Proximity
+                </div>
+
+                <div id="sensitive-resource" class="check no">
+                    ✗ Sensitive Resource
+                </div>
+
+                <div id="network-followup" class="check no">
+                    ✗ Network Follow-up
+                </div>
+
+                <div id="sequence-consistent" class="check no">
+                    ✗ Sequence Consistent
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- RESPONSE -->
+        <div class="card">
+
+            <h2>Security Response</h2>
+
+            <div class="response">
+
+                <div class="response-box">
+                    <div class="label">Agent Priority</div>
+                    <div id="agent-priority" class="value">—</div>
+                </div>
+
+                <div class="response-box">
+                    <div class="label">Recommended Action</div>
+                    <div id="recommended-action" class="value">—</div>
+                </div>
+
+                <div class="response-box">
+                    <div class="label">Safety Gate</div>
+                    <div id="safety-gate" class="value">✗ BLOCKED</div>
+                </div>
+
+                <div class="response-box">
+                    <div class="label">Containment</div>
+                    <div id="containment" class="value">✗ FAILED</div>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- TELEMETRY -->
+        <div class="card full">
+
+            <h2>Live Telemetry</h2>
+
+            <div id="events" class="events">
+
+                <div class="empty">
+                    Waiting for telemetry...
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<script>
+
+function setService(name, online) {
+
+    const element = document.getElementById(name + "-status");
+
+    if (!element) {
+        return;
+    }
+
+    if (online) {
+        element.textContent = "● ONLINE";
+        element.className = "service-status online";
+    } else {
+        element.textContent = "● OFFLINE";
+        element.className = "service-status offline";
+    }
+}
+
+
+/*
+ * IMPORTANT:
+ * /api/health returns:
+ *
+ * {
+ *   "k3s": "ONLINE",
+ *   "tetragon": "ONLINE",
+ *   "kafka": "ONLINE",
+ *   "neo4j": "ONLINE"
+ * }
+ *
+ * Therefore we must use lowercase keys.
+ */
+async function updateHealth() {
+
+    try {
+
+        const response = await fetch("/api/health");
+
+        if (!response.ok) {
+            throw new Error("Health request failed");
+        }
+
+        const data = await response.json();
+
+        setService(
+            "k3s",
+            data.k3s === "ONLINE"
+        );
+
+        setService(
+            "tetragon",
+            data.tetragon === "ONLINE"
+        );
+
+        setService(
+            "kafka",
+            data.kafka === "ONLINE"
+        );
+
+        setService(
+            "neo4j",
+            data.neo4j === "ONLINE"
+        );
+
+    } catch (error) {
+
+        console.error("Health check error:", error);
+
+        setService("k3s", false);
+        setService("tetragon", false);
+        setService("kafka", false);
+        setService("neo4j", false);
+
+    }
+
+}
+
+
+function setText(id, value) {
+
+    const element = document.getElementById(id);
+
+    if (element) {
+        element.textContent =
+            value === undefined ||
+            value === null ||
+            value === ""
+                ? "—"
+                : value;
+    }
+
+}
+
+
+function setCheck(id, value, label) {
+
+    const element = document.getElementById(id);
+
+    if (!element) {
+        return;
+    }
+
+    if (value) {
+
+        element.textContent = "✓ " + label;
+        element.className = "check yes";
+
+    } else {
+
+        element.textContent = "✗ " + label;
+        element.className = "check no";
+
+    }
+
+}
+
+
+function updateThreat(data) {
+
+    if (!data) {
+        return;
+    }
+
+    const status =
+        data.status ||
+        data.threat_status ||
+        "MONITORING";
+
+    const statusElement =
+        document.getElementById("threat-status");
+
+    if (statusElement) {
+
+        statusElement.textContent =
+            String(status).replaceAll("_", " ");
+
+        statusElement.className =
+            status === "MONITORING"
+                ? "threat-status status-monitoring"
+                : "threat-status status-threat";
+
+    }
+
+
+    setText(
+        "attack-type",
+        data.attack_type ||
+        data.attackType
+    );
+
+    setText(
+        "target",
+        data.target ||
+        data.pod ||
+        data.workload
+    );
+
+    setText(
+        "risk-score",
+        data.risk_score ??
+        data.risk
+    );
+
+    setText(
+        "severity",
+        data.severity
+    );
+
+
+    const gnn =
+        data.gnn ||
+        data.temporal_gnn ||
+        {};
+
+    const gnnAvailable =
+        gnn.available ??
+        data.gnn_available ??
+        false;
+
+    setText(
+        "gnn-available",
+        gnnAvailable ? "✓ YES" : "✗ NO"
+    );
+
+    setText(
+        "gnn-prediction",
+        gnn.prediction ??
+        data.prediction ??
+        "BENIGN"
+    );
+
+    setText(
+        "benign-prob",
+        Number(
+            gnn.benign_probability ??
+            data.benign_probability ??
+            0
+        ).toFixed(4)
+    );
+
+    setText(
+        "suspicious-prob",
+        Number(
+            gnn.suspicious_probability ??
+            data.suspicious_probability ??
+            0
+        ).toFixed(4)
+    );
+
+
+    const context =
+        data.context ||
+        data.context_validation ||
+        {};
+
+    setCheck(
+        "same-workload",
+        context.same_workload,
+        "Same Workload"
+    );
+
+    setCheck(
+        "process-ancestry",
+        context.process_ancestry,
+        "Process Ancestry"
+    );
+
+    setCheck(
+        "temporal-proximity",
+        context.temporal_proximity,
+        "Temporal Proximity"
+    );
+
+    setCheck(
+        "sensitive-resource",
+        context.sensitive_resource,
+        "Sensitive Resource"
+    );
+
+    setCheck(
+        "network-followup",
+        context.network_follow_up ??
+        context.network_followup,
+        "Network Follow-up"
+    );
+
+    setCheck(
+        "sequence-consistent",
+        context.sequence_consistent,
+        "Sequence Consistent"
+    );
+
+
+    const response =
+        data.response ||
+        data.security_response ||
+        {};
+
+    setText(
+        "agent-priority",
+        response.priority ??
+        data.agent_priority
+    );
+
+    setText(
+        "recommended-action",
+        response.action ??
+        data.recommended_action
+    );
+
+
+    const safety =
+        data.safety_gate ??
+        response.safety_gate;
+
+    setText(
+        "safety-gate",
+        safety === true
+            ? "✓ APPROVED"
+            : safety === false
+                ? "✗ BLOCKED"
+                : "—"
+    );
+
+
+    const containment =
+        data.containment ||
+        {};
+
+    setText(
+        "containment",
+        containment.success === true
+            ? "✓ SUCCESS"
+            : containment.success === false
+                ? "✗ FAILED"
+                : "—"
+    );
+
+}
+
+
+async function updateState() {
+
+    try {
+
+        const response =
+            await fetch("/api/threat");
+
+        if (!response.ok) {
+            throw new Error("State request failed");
+        }
+
+        const data =
+            await response.json();
+
+        updateThreat(data);
+
+    } catch (error) {
+
+        console.error(
+            "State update error:",
+            error
+        );
+
+    }
+
+}
+
+
+function renderGraph(data) {
+
+    const graph =
+        document.getElementById("graph");
+
+    if (!graph) {
+        return;
+    }
+
+    if (!data) {
+
+        graph.innerHTML =
+            '<div class="empty">Waiting for detection...</div>';
+
+        return;
+
+    }
+
+    /*
+     * Supports the simple graph format produced
+     * by the current dashboard backend.
+     */
+
+    const nodes =
+        data.nodes ||
+        [];
+
+    const edges =
+        data.edges ||
+        [];
+
+    if (!nodes.length) {
+
+        graph.innerHTML =
+            '<div class="empty">Waiting for detection...</div>';
+
+        return;
+
+    }
+
+    let html =
+        '<div class="graph-content">';
+
+    html +=
+        '<div class="graph-row">';
+
+    nodes.forEach(function(node, index) {
+
+        const label =
+            node.label ||
+            node.name ||
+            node.id ||
+            "Node";
+
+        const type =
+            node.type ||
+            "";
+
+        html +=
+            '<div class="node">' +
+                '<strong>' +
+                    escapeHtml(String(label)) +
+                '</strong><br>' +
+                '<small>' +
+                    escapeHtml(String(type)) +
+                '</small>' +
+            '</div>';
+
+        if (index < nodes.length - 1) {
+
+            html +=
+                '<div class="arrow">→</div>';
+
+        }
+
+    });
+
+    html +=
+        '</div>';
+
+    if (edges.length) {
+
+        html +=
+            '<div style="text-align:center;margin-top:18px;color:#687487;font-size:12px;">' +
+            edges.length +
+            " relationship(s)" +
+            '</div>';
+
+    }
+
+    html +=
+        '</div>';
+
+    graph.innerHTML = html;
+
+}
+
+
+async function updateGraph() {
+
+    try {
+
+        const response =
+            await fetch("/api/graph");
+
+        if (!response.ok) {
+            throw new Error("Graph request failed");
+        }
+
+        const data =
+            await response.json();
+
+        renderGraph(data);
+
+    } catch (error) {
+
+        console.error(
+            "Graph update error:",
+            error
+        );
+
+    }
+
+}
+
+
+function renderEvents(events) {
+
+    const container =
+        document.getElementById("events");
+
+    if (!container) {
+        return;
+    }
+
+    if (!Array.isArray(events) || events.length === 0) {
+
+        container.innerHTML =
+            '<div class="empty">Waiting for telemetry...</div>';
+
+        return;
+
+    }
+
+    container.innerHTML =
+        events
+            .slice(-30)
+            .reverse()
+            .map(function(event) {
+
+                let text;
+
+                if (typeof event === "string") {
+
+                    text = event;
+
+                } else {
+
+                    try {
+
+                        text =
+                            JSON.stringify(
+                                event
+                            );
+
+                    } catch {
+
+                        text =
+                            String(event);
+
+                    }
+
+                }
+
+                return (
+                    '<div class="event">' +
+                    escapeHtml(text) +
+                    '</div>'
+                );
+
+            })
+            .join("");
+
+}
+
+
+function escapeHtml(value) {
+
+    return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+}
+
+
+async function updateEvents() {
+
+    try {
+
+        const response =
+            await fetch("/api/events");
+
+        if (!response.ok) {
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        renderEvents(
+            data.events ||
+            data ||
+            []
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Events update error:",
+            error
+        );
+
+    }
+
+}
+
+
+/*
+ * Initial update
+ */
+
+updateHealth();
+updateState();
+updateGraph();
+updateEvents();
+
+
+/*
+ * Live polling
+ */
+
+setInterval(
+    updateHealth,
+    5000
+);
+
+setInterval(
+    updateState,
+    1000
+);
+
+setInterval(
+    updateGraph,
+    1000
+);
+
+setInterval(
+    updateEvents,
+    1000
+);
+
+</script>
+
+</body>
+</html>
