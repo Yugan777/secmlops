@@ -574,9 +574,9 @@ def process_event(event):
 
 
     if (
-        policy_result["approved"]
-        and
-        policy_result["action"] == "ISOLATE_POD"
+       policy_result["approved"]
+       and policy_result["action"] == "ISOLATE_POD"
+       and os.getenv("SEC_MLOPS_DRY_RUN", "1") == "0"
     ):
 
         containment_result = (

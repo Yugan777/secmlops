@@ -1,0 +1,254 @@
+{
+  "status": "SAFETY_GATE",
+  "threat": {
+    "detected": true,
+    "attack_type": "MULTI_STAGE_ACTIVITY",
+    "confidence": 0.8,
+    "pod": "secmlops-attack2",
+    "namespace": "default",
+    "file": "/tmp/secmlops-test/sensitive.txt",
+    "destination_ip": "172.66.147.243",
+    "time_window_seconds": 0.032715,
+    "processes": [
+      {
+        "event_id": "ff54324a-4170-48a1-b457-4d641e8276aa",
+        "timestamp": "2026-10-21T09:21:31.361323404Z",
+        "event_type": "PROCESS_EXEC",
+        "process": "/bin/sh",
+        "pid": 10115,
+        "exec_id": "eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "parent_exec_id": "eXVnYW5wYzoxNDgxNjgxMDk2NzE0ODoxMDA2Ng==",
+        "arguments": "-c \"\n    mkdir -p /tmp/secmlops-test\n    echo TEST-DATA > /tmp/secmlops-test/sensitive.txt\n    cat /tmp/secmlops-test/sensitive.txt\n    wget -T 5 -q -O /dev/null https://example.com || true\n    sleep 60\n  \"",
+        "pod": "secmlops-attack2",
+        "namespace": "default",
+        "container": "secmlops-attack2",
+        "workload": "secmlops-attack2",
+        "uid": 0
+      },
+      {
+        "event_id": "9cfea523-051b-49fa-9ed8-dabe3ed0334a",
+        "timestamp": "2026-10-21T09:21:31.372068683Z",
+        "event_type": "PROCESS_EXEC",
+        "process": "/bin/cat",
+        "pid": 10130,
+        "exec_id": "eXVnYW5wYzoxNDgxNzA2MTc2Mzk0MzoxMDEzMA==",
+        "parent_exec_id": "eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "arguments": "/tmp/secmlops-test/sensitive.txt",
+        "pod": "secmlops-attack2",
+        "namespace": "default",
+        "container": "secmlops-attack2",
+        "workload": "secmlops-attack2",
+        "uid": 0
+      },
+      {
+        "event_id": "2c4bf95d-c32c-4658-9768-bcdf8d7959a0",
+        "timestamp": "2026-10-21T09:21:31.373671742Z",
+        "event_type": "PROCESS_EXEC",
+        "process": "/bin/wget",
+        "pid": 10131,
+        "exec_id": "eXVnYW5wYzoxNDgxNzA2MzM2NjcwNDoxMDEzMQ==",
+        "parent_exec_id": "eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "arguments": "-T 5 -q -O /dev/null https://example.com",
+        "pod": "secmlops-attack2",
+        "namespace": "default",
+        "container": "secmlops-attack2",
+        "workload": "secmlops-attack2",
+        "uid": 0
+      }
+    ],
+    "context": {
+      "validated": true,
+      "context_score": 1.0,
+      "same_workload": true,
+      "process_ancestry": true,
+      "temporal_proximity": true,
+      "sensitive_resource": true,
+      "network_followup": true,
+      "sequence_consistent": true,
+      "process_chain": [
+        "/bin/sh",
+        "/bin/cat",
+        "/bin/wget"
+      ],
+      "evidence": [
+        "Observed processes belong to the same workload",
+        "Process ancestry links the observed activities",
+        "Events occur within the temporal correlation window",
+        "Sensitive resource access is present",
+        "Network activity follows the observed activity",
+        "Observed event sequence is consistent with multi-stage activity"
+      ]
+    },
+    "gnn": {
+      "available": true,
+      "benign_probability": 0.0002,
+      "suspicious_probability": 0.9998,
+      "prediction": 1
+    }
+  },
+  "gnn": {
+    "available": true,
+    "benign_probability": 0.0002,
+    "suspicious_probability": 0.9998,
+    "prediction": 1
+  },
+  "context": {
+    "validated": true,
+    "context_score": 1.0,
+    "same_workload": true,
+    "process_ancestry": true,
+    "temporal_proximity": true,
+    "sensitive_resource": true,
+    "network_followup": true,
+    "sequence_consistent": true,
+    "process_chain": [
+      "/bin/sh",
+      "/bin/cat",
+      "/bin/wget"
+    ],
+    "evidence": [
+      "Observed processes belong to the same workload",
+      "Process ancestry links the observed activities",
+      "Events occur within the temporal correlation window",
+      "Sensitive resource access is present",
+      "Network activity follows the observed activity",
+      "Observed event sequence is consistent with multi-stage activity"
+    ]
+  },
+  "risk": {
+    "risk_score": 100,
+    "severity": "CRITICAL",
+    "reasons": [
+      "Sensitive file access detected",
+      "Outbound network connection detected",
+      "Multi-stage activity detected",
+      "Multiple processes involved in attack chain",
+      "Events correlated within temporal window",
+      "GNN suspiciousness contributed 20/20 points"
+    ],
+    "gnn_probability": 0.9998
+  },
+  "agent": {
+    "assessment": "High-confidence multi-stage suspicious activity",
+    "reasoning": [
+      "Sensitive file access detected",
+      "Outbound network connection detected",
+      "Multi-stage activity detected",
+      "Multiple processes involved in attack chain",
+      "Events correlated within temporal window",
+      "GNN suspiciousness contributed 20/20 points"
+    ],
+    "recommended_action": "ISOLATE_POD",
+    "priority": "CRITICAL",
+    "risk_score": 100,
+    "pod": "secmlops-attack2",
+    "namespace": "default"
+  },
+  "safety_gate": {
+    "approved": true,
+    "action": "ISOLATE_POD",
+    "reason": "Risk score 100 meets isolation threshold and target namespace is permitted"
+  },
+  "containment": null,
+  "events": [
+    {
+      "event_type": "PROCESS_EXEC",
+      "process": "/bin/sh",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.361323404Z"
+    },
+    {
+      "event_type": "PROCESS_EXEC",
+      "process": "/bin/mkdir",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.366668173Z"
+    },
+    {
+      "event_type": "PROCESS_EXIT",
+      "process": "/bin/mkdir",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.370202954Z"
+    },
+    {
+      "event_type": "FILE_WRITE",
+      "process": "/bin/sh",
+      "file_path": "/tmp/secmlops-test/sensitive.txt",
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.371275462Z"
+    },
+    {
+      "event_type": "FILE_WRITE",
+      "process": "/bin/sh",
+      "file_path": "/tmp/secmlops-test/sensitive.txt",
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.371340630Z"
+    },
+    {
+      "event_type": "PROCESS_EXEC",
+      "process": "/bin/cat",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.372068683Z"
+    },
+    {
+      "event_type": "FILE_READ",
+      "process": "/bin/cat",
+      "file_path": "/tmp/secmlops-test/sensitive.txt",
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.372795871Z"
+    },
+    {
+      "event_type": "FILE_READ",
+      "process": "/bin/cat",
+      "file_path": "/tmp/secmlops-test/sensitive.txt",
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.372825859Z"
+    },
+    {
+      "event_type": "FILE_READ",
+      "process": "/bin/cat",
+      "file_path": "/tmp/secmlops-test/sensitive.txt",
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.372848084Z"
+    },
+    {
+      "event_type": "FILE_READ",
+      "process": "/bin/cat",
+      "file_path": "/tmp/secmlops-test/sensitive.txt",
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.372853041Z"
+    },
+    {
+      "event_type": "PROCESS_EXIT",
+      "process": "/bin/cat",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.372973618Z"
+    },
+    {
+      "event_type": "PROCESS_EXEC",
+      "process": "/bin/wget",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.373671742Z"
+    },
+    {
+      "event_type": "PROCESS_EXIT",
+      "process": "/bin/wget",
+      "file_path": null,
+      "destination_ip": null,
+      "timestamp": "2026-10-21T09:21:31.405362798Z"
+    },
+    {
+      "event_type": "NETWORK_CONNECT",
+      "process": "/bin/wget",
+      "file_path": null,
+      "destination_ip": "172.66.147.243",
+      "timestamp": "2026-10-21T09:21:31.405510020Z"
+    }
+  ],
+  "updated_at": "2026-10-21T09:21:32.752564+00:00"
+}
