@@ -103,22 +103,21 @@ def get_current_events():
     for event in list(event_buffer)[-50:]:
 
         events.append({
-
-            "event_type":
-                event.get("event_type"),
-
-            "process":
-                event.get("process"),
-
-            "file_path":
-                event.get("file_path"),
-
-            "destination_ip":
-                event.get("destination_ip"),
-
-            "timestamp":
-                event.get("timestamp")
-
+            "event_id": event.get("event_id"),
+            "event_type": event.get("event_type"),
+            "process": event.get("process"),
+            "pid": event.get("pid"),
+            "exec_id": event.get("exec_id"),
+            "parent_exec_id": event.get("parent_exec_id"),
+            "pod": event.get("pod"),
+            "namespace": event.get("namespace"),
+            "container": event.get("container"),
+            "workload": event.get("workload"),
+            "file_path": event.get("file_path"),
+            "destination_ip": event.get("destination_ip"),
+            "destination_port": event.get("destination_port"),
+            "protocol": event.get("protocol"),
+            "timestamp": event.get("timestamp"),
         })
 
     return events
@@ -127,6 +126,21 @@ def get_current_events():
 def write_dashboard_state(state):
 
     try:
+        # Populate temporal attack graph if not explicitly specified
+        if "graph" not in state or not state["graph"]:
+            state["graph"] = graph.to_dict()
+
+        # Mirror threat and risk keys to top level for dashboard API compatibility
+        threat = state.get("threat") or {}
+        risk = state.get("risk") or {}
+        if "attack_type" not in state or state["attack_type"] is None:
+            state["attack_type"] = threat.get("attack_type")
+        if "target" not in state or state["target"] is None:
+            state["target"] = threat.get("pod")
+        if "risk_score" not in state or state["risk_score"] is None:
+            state["risk_score"] = risk.get("risk_score")
+        if "severity" not in state or state["severity"] is None:
+            state["severity"] = risk.get("severity")
 
         state["updated_at"] = (
             datetime.now(timezone.utc).isoformat()
@@ -170,7 +184,14 @@ def write_monitoring_state():
 
         "containment": None,
 
-        "events": get_current_events()
+        "events": get_current_events(),
+
+        "graph": {
+            "nodes": [],
+            "edges": [],
+            "attack_chain": [],
+            "has_incident": False,
+        }
 
     })
 

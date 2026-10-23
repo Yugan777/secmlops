@@ -835,7 +835,7 @@ function renderGraph(data) {
         return;
     }
 
-    if (!data) {
+    if (!data || !data.has_incident || !data.nodes || !data.nodes.length) {
 
         graph.innerHTML =
             '<div class="empty">Waiting for detection...</div>';
@@ -843,11 +843,6 @@ function renderGraph(data) {
         return;
 
     }
-
-    /*
-     * Supports the simple graph format produced
-     * by the current dashboard backend.
-     */
 
     const nodes =
         data.nodes ||
@@ -856,15 +851,6 @@ function renderGraph(data) {
     const edges =
         data.edges ||
         [];
-
-    if (!nodes.length) {
-
-        graph.innerHTML =
-            '<div class="empty">Waiting for detection...</div>';
-
-        return;
-
-    }
 
     let html =
         '<div class="graph-content">';
@@ -889,7 +875,7 @@ function renderGraph(data) {
                 '<strong>' +
                     escapeHtml(String(label)) +
                 '</strong><br>' +
-                '<small>' +
+                '<small style="color:#8793a5;text-transform:uppercase;font-size:11px;">' +
                     escapeHtml(String(type)) +
                 '</small>' +
             '</div>';
@@ -909,9 +895,45 @@ function renderGraph(data) {
     if (edges.length) {
 
         html +=
-            '<div style="text-align:center;margin-top:18px;color:#687487;font-size:12px;">' +
+            '<div style="text-align:center;margin-top:16px;color:#8793a5;font-size:12px;font-weight:600;">' +
             edges.length +
-            " relationship(s)" +
+            " Observed Relationship(s)" +
+            '</div>';
+
+        html +=
+            '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px;">';
+
+        edges.forEach(function(edge) {
+
+            const src =
+                edge.source_label ||
+                edge.source;
+
+            const tgt =
+                edge.target_label ||
+                edge.target;
+
+            const rel =
+                edge.label ||
+                edge.relationship ||
+                "RELATED";
+
+            html +=
+                '<div style="background:#0e131b;border:1px solid #202733;border-radius:6px;padding:6px 12px;font-size:12px;font-family:monospace;color:#b8c2d1;">' +
+                    '<span style="color:#e8edf5;font-weight:600;">' +
+                        escapeHtml(String(src)) +
+                    '</span> ' +
+                    '<span style="color:#35d07f;font-weight:600;">──[' +
+                        escapeHtml(String(rel)) +
+                    ']──►</span> ' +
+                    '<span style="color:#e8edf5;font-weight:600;">' +
+                        escapeHtml(String(tgt)) +
+                    '</span>' +
+                '</div>';
+
+        });
+
+        html +=
             '</div>';
 
     }

@@ -53,18 +53,18 @@ class TemporalSecurityGraph:
         """
         Add a timestamped relationship.
 
-        RUNS is structural, so duplicate RUNS edges are avoided.
-        Other relationships remain event-based and may occur multiple times.
+        Avoid duplicate edges between the same source and target for the
+        same relationship type when events are processed repeatedly.
         """
 
-        if relationship == "RUNS":
+        existing = self.graph.get_edge_data(source, target, default={})
 
-            existing = self.graph.get_edge_data(source, target, default={})
-
-            for key, data in existing.items():
-                if data.get("relationship") == "RUNS":
+        for key, data in existing.items():
+            if data.get("relationship") == relationship:
+                if timestamp:
                     data["timestamp"] = timestamp
-                    return
+                data.update(attributes)
+                return
 
         self.graph.add_edge(
             source,
@@ -164,9 +164,11 @@ class TemporalSecurityGraph:
         process_node = None
 
         if exec_id:
-
             process_node = f"process:{exec_id}"
+        elif process:
+            process_node = f"process:{process}:{pid}" if pid else f"process:{process}"
 
+        if process_node:
             self._add_node(
                 process_node,
                 "PROCESS",
@@ -208,7 +210,7 @@ class TemporalSecurityGraph:
 
             parent_exec_id = event.get("parent_exec_id")
 
-            if parent_exec_id and exec_id:
+            if parent_exec_id and process_node:
 
                 parent_node = f"process:{parent_exec_id}"
 
@@ -228,9 +230,9 @@ class TemporalSecurityGraph:
         # FILE ACCESS
         # --------------------------------------------------
 
-        elif event_type in ("FILE_READ", "FILE_WRITE"):
+        elif event_type in ("FILE_READ", "FILE_WRITE", "FILE_ACCESS"):
 
-            file_path = event.get("file_path")
+            file_path = event.get("file_path") or event.get("file")
 
             if file_path and process_node:
 
@@ -246,6 +248,8 @@ class TemporalSecurityGraph:
                     "READ"
                     if event_type == "FILE_READ"
                     else "MODIFIED"
+                    if event_type == "FILE_WRITE"
+                    else "ACCESSED"
                 )
 
                 self._add_edge(
@@ -259,9 +263,9 @@ class TemporalSecurityGraph:
         # NETWORK CONNECTION
         # --------------------------------------------------
 
-        elif event_type == "NETWORK_CONNECT":
+        elif event_type in ("NETWORK_CONNECT", "NETWORK_SEND"):
 
-            destination_ip = event.get("destination_ip")
+            destination_ip = event.get("destination_ip") or event.get("dst_ip")
 
             if destination_ip and process_node:
 
@@ -270,17 +274,21 @@ class TemporalSecurityGraph:
                 self._add_node(
                     ip_node,
                     "IP",
-                    address=destination_ip
+                    address=str(destination_ip)
+                )
+
+                relationship = (
+                    "CONNECTED_TO"
+                    if event_type == "NETWORK_CONNECT"
+                    else "SENT_TO"
                 )
 
                 self._add_edge(
                     process_node,
                     ip_node,
-                    "CONNECTED_TO",
+                    relationship,
                     timestamp,
-                    destination_port=event.get(
-                        "destination_port"
-                    ),
+                    destination_port=event.get("destination_port") or event.get("dport"),
                     protocol=event.get("protocol")
                 )
 
@@ -416,3 +424,213 @@ class TemporalSecurityGraph:
                 )
 
         print("==================================\n")
+
+    def build_from_events(self, events):
+        """
+        Populate the graph from an iterable of normalized events.
+        """
+        if not events:
+            return
+        for event in events:
+            self.add_event(event)
+
+    def build_from_threat(self, threat):
+        """
+        Reconstruct graph relationships from a detected threat dictionary.
+        Uses process ancestry, sensitive file access, and network connections.
+        """
+        if not threat or not isinstance(threat, dict):
+            return
+
+        pod = threat.get("pod")
+        namespace = threat.get("namespace", "default")
+        processes = threat.get("processes", [])
+
+        for p in processes:
+            self.add_event({
+                "event_type": "PROCESS_EXEC",
+                "timestamp": p.get("timestamp"),
+                "process": p.get("process"),
+                "pid": p.get("pid"),
+                "exec_id": p.get("exec_id"),
+                "parent_exec_id": p.get("parent_exec_id"),
+                "pod": p.get("pod", pod),
+                "namespace": p.get("namespace", namespace),
+            })
+
+        # Connect file access to the file reader process
+        if threat.get("file"):
+            file_proc = None
+            for p in processes:
+                proc_name = (p.get("process") or "").lower()
+                if "cat" in proc_name or "grep" in proc_name:
+                    file_proc = p
+                    break
+            if not file_proc and len(processes) > 1:
+                file_proc = processes[1]
+            elif not file_proc and processes:
+                file_proc = processes[0]
+
+            self.add_event({
+                "event_type": "FILE_READ",
+                "timestamp": processes[1].get("timestamp") if len(processes) > 1 else (processes[0].get("timestamp") if processes else None),
+                "process": file_proc.get("process") if file_proc else "/bin/cat",
+                "pid": file_proc.get("pid") if file_proc else None,
+                "exec_id": file_proc.get("exec_id") if file_proc else None,
+                "pod": pod,
+                "namespace": namespace,
+                "file_path": threat.get("file"),
+            })
+
+        # Connect network event to the network process
+        if threat.get("destination_ip"):
+            net_proc = None
+            for p in processes:
+                proc_name = (p.get("process") or "").lower()
+                if "wget" in proc_name or "curl" in proc_name:
+                    net_proc = p
+                    break
+            if not net_proc and processes:
+                net_proc = processes[-1]
+
+            self.add_event({
+                "event_type": "NETWORK_CONNECT",
+                "timestamp": processes[-1].get("timestamp") if processes else None,
+                "process": net_proc.get("process") if net_proc else "/bin/wget",
+                "pid": net_proc.get("pid") if net_proc else None,
+                "exec_id": net_proc.get("exec_id") if net_proc else None,
+                "pod": pod,
+                "namespace": namespace,
+                "destination_ip": threat.get("destination_ip"),
+            })
+
+    def to_dict(self):
+        """
+        Export graph representation to a clean dictionary structure
+        suitable for JSON serialization and API / UI rendering.
+        """
+        import os
+
+        nodes = []
+        edges = []
+        seen_nodes = set()
+
+        def get_node_label(node_id, data):
+            ntype = data.get("node_type", "")
+            if ntype == "POD":
+                return data.get("name") or node_id.split(":")[-1]
+            elif ntype == "PROCESS":
+                binary = data.get("binary") or data.get("process")
+                if binary:
+                    return os.path.basename(str(binary))
+                parts = node_id.split(":")
+                val = parts[-1] if len(parts) > 1 else node_id
+                if val.startswith("exec-"):
+                    return val.replace("exec-", "")
+                if len(val) > 16 and "=" in val:
+                    return "parent_process"
+                return val
+            elif ntype == "FILE":
+                path = data.get("path")
+                if path:
+                    return os.path.basename(str(path))
+                return node_id.replace("file:", "")
+            elif ntype == "IP":
+                return data.get("address") or node_id.replace("ip:", "")
+            return node_id
+
+        # Logical sequential order:
+        # Pod -> Root Process -> Spawned Process(es) -> File(s) -> Network Destination(s)
+        pod_nodes = []
+        root_process_nodes = []
+        child_process_nodes = []
+        file_nodes = []
+        network_nodes = []
+        other_nodes = []
+
+        spawned_targets = set()
+        for s, t, d in self.graph.edges(data=True):
+            if d.get("relationship") == "SPAWNED":
+                spawned_targets.add(t)
+
+        for node_id, data in self.graph.nodes(data=True):
+            ntype = data.get("node_type", "").upper()
+            if ntype == "POD":
+                pod_nodes.append((node_id, data))
+            elif ntype == "PROCESS":
+                if node_id in spawned_targets:
+                    child_process_nodes.append((node_id, data))
+                else:
+                    root_process_nodes.append((node_id, data))
+            elif ntype == "FILE":
+                file_nodes.append((node_id, data))
+            elif ntype == "IP":
+                network_nodes.append((node_id, data))
+            else:
+                other_nodes.append((node_id, data))
+
+        ordered_nodes = (
+            pod_nodes +
+            root_process_nodes +
+            child_process_nodes +
+            file_nodes +
+            network_nodes +
+            other_nodes
+        )
+
+        for node_id, data in ordered_nodes:
+            if node_id in seen_nodes:
+                continue
+            seen_nodes.add(node_id)
+            label = get_node_label(node_id, data)
+            ntype = data.get("node_type", "ENTITY").lower()
+            if ntype == "ip":
+                ntype = "network"
+
+            node_dict = {
+                "id": str(node_id),
+                "label": label,
+                "type": ntype,
+            }
+            if data.get("binary"):
+                node_dict["binary"] = data.get("binary")
+            if data.get("pid"):
+                node_dict["pid"] = data.get("pid")
+            if data.get("path"):
+                node_dict["path"] = data.get("path")
+            if data.get("address"):
+                node_dict["address"] = data.get("address")
+            if data.get("name"):
+                node_dict["name"] = data.get("name")
+            if data.get("namespace"):
+                node_dict["namespace"] = data.get("namespace")
+
+            nodes.append(node_dict)
+
+        node_label_map = {n["id"]: n["label"] for n in nodes}
+
+        for source, target, data in self.graph.edges(data=True):
+            rel = data.get("relationship", "RELATED")
+            edge_dict = {
+                "source": str(source),
+                "target": str(target),
+                "source_label": node_label_map.get(source, str(source)),
+                "target_label": node_label_map.get(target, str(target)),
+                "label": rel,
+                "relationship": rel,
+            }
+            if data.get("timestamp"):
+                edge_dict["timestamp"] = data.get("timestamp")
+            if data.get("destination_port"):
+                edge_dict["destination_port"] = data.get("destination_port")
+            if data.get("protocol"):
+                edge_dict["protocol"] = data.get("protocol")
+
+            edges.append(edge_dict)
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "attack_chain": self.get_attack_chain(),
+            "has_incident": len(nodes) > 0,
+        }

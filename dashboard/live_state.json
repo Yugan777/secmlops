@@ -250,5 +250,163 @@
       "timestamp": "2026-10-21T09:21:31.405510020Z"
     }
   ],
-  "updated_at": "2026-10-21T09:21:32.752564+00:00"
+  "updated_at": "2026-10-21T09:21:32.752564+00:00",
+  "graph": {
+    "nodes": [
+      {
+        "id": "pod:default:secmlops-attack2",
+        "label": "secmlops-attack2",
+        "type": "pod",
+        "name": "secmlops-attack2",
+        "namespace": "default"
+      },
+      {
+        "id": "process:eXVnYW5wYzoxNDgxNjgxMDk2NzE0ODoxMDA2Ng==",
+        "label": "parent_process",
+        "type": "process"
+      },
+      {
+        "id": "process:eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "label": "sh",
+        "type": "process",
+        "binary": "/bin/sh",
+        "pid": 10115,
+        "namespace": "default"
+      },
+      {
+        "id": "process:eXVnYW5wYzoxNDgxNzA2MTc2Mzk0MzoxMDEzMA==",
+        "label": "cat",
+        "type": "process",
+        "binary": "/bin/cat",
+        "pid": 10130,
+        "namespace": "default"
+      },
+      {
+        "id": "process:eXVnYW5wYzoxNDgxNzA2MzM2NjcwNDoxMDEzMQ==",
+        "label": "wget",
+        "type": "process",
+        "binary": "/bin/wget",
+        "pid": 10131,
+        "namespace": "default"
+      },
+      {
+        "id": "file:/tmp/secmlops-test/sensitive.txt",
+        "label": "sensitive.txt",
+        "type": "file",
+        "path": "/tmp/secmlops-test/sensitive.txt"
+      },
+      {
+        "id": "ip:172.66.147.243",
+        "label": "172.66.147.243",
+        "type": "network",
+        "address": "172.66.147.243"
+      }
+    ],
+    "edges": [
+      {
+        "source": "process:eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "target": "process:eXVnYW5wYzoxNDgxNzA2MTc2Mzk0MzoxMDEzMA==",
+        "source_label": "sh",
+        "target_label": "cat",
+        "label": "SPAWNED",
+        "relationship": "SPAWNED",
+        "timestamp": "2026-10-21T09:21:31.372068683Z"
+      },
+      {
+        "source": "process:eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "target": "process:eXVnYW5wYzoxNDgxNzA2MzM2NjcwNDoxMDEzMQ==",
+        "source_label": "sh",
+        "target_label": "wget",
+        "label": "SPAWNED",
+        "relationship": "SPAWNED",
+        "timestamp": "2026-10-21T09:21:31.373671742Z"
+      },
+      {
+        "source": "pod:default:secmlops-attack2",
+        "target": "process:eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "source_label": "secmlops-attack2",
+        "target_label": "sh",
+        "label": "RUNS",
+        "relationship": "RUNS",
+        "timestamp": "2026-10-21T09:21:31.361323404Z"
+      },
+      {
+        "source": "pod:default:secmlops-attack2",
+        "target": "process:eXVnYW5wYzoxNDgxNzA2MTc2Mzk0MzoxMDEzMA==",
+        "source_label": "secmlops-attack2",
+        "target_label": "cat",
+        "label": "RUNS",
+        "relationship": "RUNS",
+        "timestamp": "2026-10-21T09:21:31.372068683Z"
+      },
+      {
+        "source": "pod:default:secmlops-attack2",
+        "target": "process:eXVnYW5wYzoxNDgxNzA2MzM2NjcwNDoxMDEzMQ==",
+        "source_label": "secmlops-attack2",
+        "target_label": "wget",
+        "label": "RUNS",
+        "relationship": "RUNS",
+        "timestamp": "2026-10-21T09:21:31.373671742Z"
+      },
+      {
+        "source": "process:eXVnYW5wYzoxNDgxNjgxMDk2NzE0ODoxMDA2Ng==",
+        "target": "process:eXVnYW5wYzoxNDgxNzA1MTAxNzkyMjoxMDExNQ==",
+        "source_label": "parent_process",
+        "target_label": "sh",
+        "label": "SPAWNED",
+        "relationship": "SPAWNED",
+        "timestamp": "2026-10-21T09:21:31.361323404Z"
+      },
+      {
+        "source": "process:eXVnYW5wYzoxNDgxNzA2MTc2Mzk0MzoxMDEzMA==",
+        "target": "file:/tmp/secmlops-test/sensitive.txt",
+        "source_label": "cat",
+        "target_label": "sensitive.txt",
+        "label": "READ",
+        "relationship": "READ",
+        "timestamp": "2026-10-21T09:21:31.372068683Z"
+      },
+      {
+        "source": "process:eXVnYW5wYzoxNDgxNzA2MzM2NjcwNDoxMDEzMQ==",
+        "target": "ip:172.66.147.243",
+        "source_label": "wget",
+        "target_label": "172.66.147.243",
+        "label": "CONNECTED_TO",
+        "relationship": "CONNECTED_TO",
+        "timestamp": "2026-10-21T09:21:31.373671742Z"
+      }
+    ],
+    "attack_chain": [
+      [
+        "/bin/sh",
+        "SPAWNED",
+        "/bin/cat"
+      ],
+      [
+        "/bin/sh",
+        "SPAWNED",
+        "/bin/wget"
+      ],
+      [
+        "PROCESS",
+        "SPAWNED",
+        "/bin/sh"
+      ],
+      [
+        "/bin/cat",
+        "READ",
+        "/tmp/secmlops-test/sensitive.txt"
+      ],
+      [
+        "/bin/wget",
+        "CONNECTED_TO",
+        "172.66.147.243"
+      ]
+    ],
+    "has_incident": true
+  },
+  "attack_type": "MULTI_STAGE_ACTIVITY",
+  "target": "secmlops-attack2",
+  "risk_score": 100,
+  "severity": "CRITICAL"
 }
