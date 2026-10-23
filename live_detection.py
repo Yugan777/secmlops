@@ -1,4 +1,6 @@
+
 import json
+import os
 import subprocess
 from collections import deque
 from datetime import datetime, timezone
@@ -19,7 +21,11 @@ from gnn.runtime import GNNRuntime
 # ============================================================
 
 WINDOW_SECONDS = 10
-STATE_FILE = "dashboard/live_state.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.environ.get(
+    "SEC_MLOPS_STATE_FILE",
+    os.path.join(BASE_DIR, "dashboard", "live_state.json")
+)
 
 
 # ============================================================
@@ -471,7 +477,8 @@ def process_event(event):
 
     agent_result = security_agent.analyze(
         detection,
-        risk
+        risk,
+        graph_data=graph.to_dict()
     )
 
 
@@ -644,73 +651,69 @@ def process_event(event):
 
 
         # ----------------------------------------------------
-        # FINAL DASHBOARD STATE
+        # FINAL DASHBOARD STATE (Enforcement)
         # ----------------------------------------------------
 
         final_status = (
-
             "CONTAINED"
-
             if containment_result["success"]
-
             else
-
             "CONTAINMENT_FAILED"
-
         )
 
-
         write_dashboard_state({
-
             "status": final_status,
-
             "threat": detection,
-
             "gnn": gnn_result,
-
             "context": context,
-
             "risk": risk,
-
             "agent": agent_result,
-
             "safety_gate": policy_result,
-
             "containment": containment_result,
-
             "events": get_current_events()
-
         })
-
 
     else:
 
         # ----------------------------------------------------
-        # No containment
+        # Dry-run or Non-containment handling
         # ----------------------------------------------------
 
+        if policy_result.get("approved") and policy_result.get("action") == "ISOLATE_POD":
+            final_status = "CONTAINMENT_APPROVED"
+            containment_info = {
+                "success": False,
+                "action": "ISOLATE_POD",
+                "status": "DRY_RUN",
+                "message": "Recommended and approved by Safety Gate; cluster isolation skipped (SEC_MLOPS_DRY_RUN=1 safe mode)"
+            }
+            print("\nCONTAINMENT (DRY-RUN)")
+            print("-" * 60)
+            print("Status    : Approved by Safety Gate; execution skipped (SEC_MLOPS_DRY_RUN=1)")
+            print(f"Action    : ISOLATE_POD -> {detection.get('namespace')}/{detection.get('pod')}")
+        elif policy_result.get("approved") is False:
+            final_status = "SAFETY_GATE_BLOCKED"
+            containment_info = {
+                "success": False,
+                "action": "NO_ACTION",
+                "status": "BLOCKED",
+                "message": f"Containment rejected by Policy Safety Gate: {policy_result.get('reason')}"
+            }
+        else:
+            final_status = "MONITORING"
+            containment_info = None
+
         write_dashboard_state({
-
-            "status": "DETECTED_NO_CONTAINMENT",
-
+            "status": final_status,
             "threat": detection,
-
             "gnn": gnn_result,
-
             "context": context,
-
             "risk": risk,
-
             "agent": agent_result,
-
             "safety_gate": policy_result,
-
-            "containment": None,
-
+            "containment": containment_info,
             "events": get_current_events()
-
         })
-
 
     print(
         "=" * 60 + "\n"

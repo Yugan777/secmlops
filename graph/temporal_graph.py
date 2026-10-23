@@ -445,11 +445,12 @@ class TemporalSecurityGraph:
         pod = threat.get("pod")
         namespace = threat.get("namespace", "default")
         processes = threat.get("processes", [])
+        base_ts = threat.get("timestamp") or datetime.now(timezone.utc).isoformat()
 
         for p in processes:
             self.add_event({
                 "event_type": "PROCESS_EXEC",
-                "timestamp": p.get("timestamp"),
+                "timestamp": p.get("timestamp") or base_ts,
                 "process": p.get("process"),
                 "pid": p.get("pid"),
                 "exec_id": p.get("exec_id"),
@@ -471,9 +472,11 @@ class TemporalSecurityGraph:
             elif not file_proc and processes:
                 file_proc = processes[0]
 
+            file_ts = (file_proc.get("timestamp") if file_proc else None) or base_ts
+
             self.add_event({
                 "event_type": "FILE_READ",
-                "timestamp": processes[1].get("timestamp") if len(processes) > 1 else (processes[0].get("timestamp") if processes else None),
+                "timestamp": file_ts,
                 "process": file_proc.get("process") if file_proc else "/bin/cat",
                 "pid": file_proc.get("pid") if file_proc else None,
                 "exec_id": file_proc.get("exec_id") if file_proc else None,
@@ -493,9 +496,11 @@ class TemporalSecurityGraph:
             if not net_proc and processes:
                 net_proc = processes[-1]
 
+            net_ts = (net_proc.get("timestamp") if net_proc else None) or base_ts
+
             self.add_event({
                 "event_type": "NETWORK_CONNECT",
-                "timestamp": processes[-1].get("timestamp") if processes else None,
+                "timestamp": net_ts,
                 "process": net_proc.get("process") if net_proc else "/bin/wget",
                 "pid": net_proc.get("pid") if net_proc else None,
                 "exec_id": net_proc.get("exec_id") if net_proc else None,

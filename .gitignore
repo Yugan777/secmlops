@@ -32,3 +32,4 @@ Thumbs.db
 neo4j-data/
 k8s/neo4j-values.yaml
 *~
+*.pid

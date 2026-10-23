@@ -1,1118 +1,1004 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecMLOps — Autonomous Cyber Defense</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecMLOps — Security Operations Center</title>
+  <meta name="description" content="SecMLOps SOC dashboard: eBPF telemetry, temporal graph analysis, GNN inference, and evidence-grounded AI response.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060a10;--bg-panel:#0b1018;--bg-card:#0d141f;--bg-inset:#070b13;
+      --border:#1a2236;--border-b:#2a3a55;
+      --txt:#e4eaf5;--txt-s:#7b8ba3;--txt-m:#4e5d73;
+      --cyan:#00d4ff;--blue:#3b82f6;--green:#22d87a;--amber:#f59e0b;--red:#f43f5e;--purple:#a78bfa;
+      --r:6px;--R:10px;--mono:'JetBrains Mono',monospace;--t:all .18s ease;
+    }
+    html,body{height:100%}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);font-size:13px;line-height:1.5;overflow:hidden}
+    #app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:220px 1fr;height:100vh}
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+    /* topbar */
+    #topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--bg-panel);border-bottom:1px solid var(--border);z-index:10}
+    .brand{display:flex;align-items:center;gap:10px}
+    .brand-logo{width:28px;height:28px;background:linear-gradient(135deg,var(--cyan),var(--blue));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px}
+    .brand-name{font-size:15px;font-weight:700;letter-spacing:-.3px;background:linear-gradient(90deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .brand-sub{font-size:11px;color:var(--txt-m)}
+    #status-badge{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.5px;border:1px solid;transition:var(--t)}
+    .b-mon{background:rgba(34,216,122,.08);color:var(--green);border-color:rgba(34,216,122,.25)}
+    .b-thr{background:rgba(244,63,94,.1);color:var(--red);border-color:rgba(244,63,94,.3);animation:pulse 1.5s ease-in-out infinite}
+    .b-ana{background:rgba(245,158,11,.08);color:var(--amber);border-color:rgba(245,158,11,.25)}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(244,63,94,0)}50%{box-shadow:0 0 0 4px rgba(244,63,94,.15)}}
+    #last-upd{font-size:11px;color:var(--txt-m);font-family:var(--mono)}
+    .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+    .dot-p{animation:dotp 2s ease-in-out infinite}
+    @keyframes dotp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
 
-        body {
-            margin: 0;
-            background: #080b10;
-            color: #e8edf5;
-            font-family: Arial, Helvetica, sans-serif;
-        }
+    /* sidebar */
+    #sidebar{grid-row:2;background:var(--bg-panel);border-right:1px solid var(--border);padding:16px 10px;display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+    .s-sect{font-size:10px;font-weight:600;letter-spacing:1px;color:var(--txt-m);text-transform:uppercase;padding:10px 10px 6px}
+    .nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:500;color:var(--txt-s);transition:var(--t);border:1px solid transparent;user-select:none}
+    .nav:hover{background:rgba(255,255,255,.04);color:var(--txt)}
+    .nav.act{background:rgba(0,212,255,.08);color:var(--cyan);border-color:rgba(0,212,255,.15)}
+    .nav-ic{font-size:15px;width:20px;text-align:center}
+    .nav-badge{margin-left:auto;background:rgba(244,63,94,.15);color:var(--red);border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px}
+    .s-div{height:1px;background:var(--border);margin:8px 10px}
+    #sb-health{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+    .svc-row{display:flex;align-items:center;justify-content:space-between;font-size:11px}
+    .svc-n{color:var(--txt-s)}
+    .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .s-on{background:var(--green);box-shadow:0 0 5px var(--green)}
+    .s-off{background:var(--red)}
+    .s-unk{background:var(--txt-m)}
+    .s-nc{background:var(--amber)}
 
-        .header {
-            padding: 24px 32px;
-            border-bottom: 1px solid #202733;
-            background: #0b0f15;
-        }
+    /* main */
+    #main{grid-column:2;grid-row:2;overflow-y:auto;padding:20px}
+    .view{display:none}.view.act{display:block}
 
-        .title {
-            font-size: 28px;
-            font-weight: 700;
-        }
+    /* panels */
+    .panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--R);padding:18px}
+    .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .pt{font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--txt-s);text-transform:uppercase}
+    .pbadge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;border:1px solid}
 
-        .subtitle {
-            margin-top: 8px;
-            color: #8793a5;
-            font-size: 14px;
-        }
+    /* grids */
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .stk{display:flex;flex-direction:column;gap:16px}
 
-        .container {
-            padding: 24px 32px;
-            max-width: 1600px;
-            margin: auto;
-        }
+    /* metric */
+    .mb{background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+    .ml{font-size:10px;font-weight:600;letter-spacing:.6px;color:var(--txt-m);text-transform:uppercase;margin-bottom:6px}
+    .mv{font-size:22px;font-weight:700;line-height:1}
+    .mv.sm{font-size:14px;font-weight:600}
+    .mv.mono{font-family:var(--mono)}
 
-        .services {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 20px;
-        }
+    /* colors */
+    .cg{color:var(--green)}.cr{color:var(--red)}.ca{color:var(--amber)}.cc{color:var(--cyan)}.cb{color:var(--blue)}.cm{color:var(--txt-m)}.cs{color:var(--txt-s)}
 
-        .service,
-        .card {
-            background: #0e131b;
-            border: 1px solid #202733;
-            border-radius: 10px;
-            padding: 18px;
-        }
+    /* severity */
+    .sev{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px}
+    .sc{background:rgba(244,63,94,.15);color:var(--red);border:1px solid rgba(244,63,94,.3)}
+    .sh{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+    .sm2{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
+    .sl{background:rgba(34,216,122,.08);color:var(--green);border:1px solid rgba(34,216,122,.2)}
 
-        .service-name {
-            color: #9ba7b8;
-            font-size: 13px;
-            margin-bottom: 10px;
-        }
+    /* checks */
+    .cg2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .ci{display:flex;align-items:center;gap:8px;background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);padding:9px 12px;font-size:12px;font-weight:500;transition:var(--t)}
+    .ci.pass{border-color:rgba(34,216,122,.2);color:var(--green)}
+    .ci.fail{color:var(--txt-m)}
 
-        .service-status {
-            font-size: 18px;
-            font-weight: 700;
-        }
+    /* graph container */
+    .gcw-box{background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);position:relative;overflow:auto}
+    .ge{display:flex;flex-direction:column;align-items:center;justify-content:center;height:280px;color:var(--txt-m);gap:10px;font-size:13px}
+    .gsvg-el{width:100%;min-height:460px;display:block}
 
-        .online {
-            color: #35d07f;
-        }
+    /* event log */
+    .elog{background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);max-height:260px;overflow-y:auto;display:flex;flex-direction:column}
+    .erow{display:flex;align-items:baseline;gap:12px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.03);font-size:11px;font-family:var(--mono)}
+    .erow:last-child{border-bottom:none}
+    .erow:hover{background:rgba(255,255,255,.02)}
+    .ets{color:var(--txt-m);flex-shrink:0}
+    .ety{padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;flex-shrink:0}
+    .ety.PROCESS_EXEC{background:rgba(59,130,246,.15);color:var(--blue)}
+    .ety.FILE_READ,.ety.FILE_WRITE{background:rgba(245,158,11,.15);color:var(--amber)}
+    .ety.NETWORK_CONNECT{background:rgba(244,63,94,.15);color:var(--red)}
+    .edet{color:var(--txt-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-        .offline {
-            color: #ff5c67;
-        }
+    /* lifecycle steps */
+    .lcs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0}
+    .lcs-s{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--bg-inset);color:var(--txt-m)}
+    .lcs-s.done{border-color:rgba(34,216,122,.3);color:var(--green);background:rgba(34,216,122,.07)}
+    .lcs-s.warn{border-color:rgba(244,63,94,.3);color:var(--red);background:rgba(244,63,94,.07)}
+    .lc-arr{color:var(--txt-m);font-size:12px}
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
+    /* evidence lists */
+    .evl{display:flex;flex-direction:column;gap:6px}
+    .evi{display:flex;gap:10px;background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;font-size:12px;line-height:1.5}
+    .evi.ef{border-left:3px solid var(--blue)}
+    .evi.eg{border-left:3px solid var(--green)}
+    .evi.eu{border-left:3px solid var(--amber)}
+    .ev-ic{flex-shrink:0;margin-top:1px}
+    .ev-tx{color:var(--txt)}
 
-        .card {
-            min-height: 180px;
-        }
+    /* options cards */
+    .opc{background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px}
+    .opc.sel{border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.03)}
+    .op-act{font-size:13px;font-weight:700;font-family:var(--mono)}
+    .op-row{display:flex;gap:8px;font-size:11px}
+    .op-rl{color:var(--txt-m);width:60px;flex-shrink:0}
+    .op-rv{color:var(--txt-s)}
 
-        .full {
-            grid-column: 1 / -1;
-        }
+    /* simulation */
+    .sim-g{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .simc{background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
+    .sim-n{font-size:13px;font-weight:600;color:var(--txt)}
+    .sim-d{font-size:11px;color:var(--txt-s);line-height:1.6}
+    .sim-m{display:flex;gap:8px;flex-wrap:wrap}
+    .sim-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:rgba(0,212,255,.08);color:var(--cyan);border:1px solid rgba(0,212,255,.15)}
+    .sim-f{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+    #sim-out{background:var(--bg-inset);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;font-family:var(--mono);font-size:11px;color:var(--txt-s);min-height:80px;white-space:pre-wrap;line-height:1.6}
 
-        h2 {
-            margin: 0 0 18px 0;
-            font-size: 17px;
-        }
+    /* buttons */
+    .btn{padding:6px 14px;border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;border:1px solid;transition:var(--t);display:inline-flex;align-items:center;gap:6px}
+    .btn-p{background:rgba(0,212,255,.1);color:var(--cyan);border-color:rgba(0,212,255,.3)}
+    .btn-p:hover{background:rgba(0,212,255,.2)}
+    .btn-n{background:rgba(255,255,255,.05);color:var(--txt);border-color:var(--border)}
+    .btn-n:hover{background:rgba(255,255,255,.09)}
+    .btn-d{background:rgba(244,63,94,.1);color:var(--red);border-color:rgba(244,63,94,.3)}
+    .btn-d:hover{background:rgba(244,63,94,.2)}
 
-        .threat-status {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 18px;
-        }
-
-        .status-monitoring {
-            color: #35d07f;
-        }
-
-        .status-threat {
-            color: #ff5c67;
-        }
-
-        .details {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-        }
-
-        .detail {
-            background: #090d13;
-            border-radius: 7px;
-            padding: 12px;
-        }
-
-        .label {
-            color: #7f8a9b;
-            font-size: 12px;
-            margin-bottom: 6px;
-        }
-
-        .value {
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .probabilities {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-        }
-
-        .prob {
-            background: #090d13;
-            padding: 15px;
-            border-radius: 7px;
-        }
-
-        .prob-value {
-            font-size: 26px;
-            font-weight: 700;
-            margin-top: 6px;
-        }
-
-        .graph {
-            min-height: 220px;
-            background: #090d13;
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #667386;
-        }
-
-        .graph-content {
-            width: 100%;
-        }
-
-        .graph-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-
-        .node {
-            border: 1px solid #344052;
-            background: #111722;
-            border-radius: 8px;
-            padding: 12px 16px;
-            text-align: center;
-            min-width: 130px;
-        }
-
-        .arrow {
-            color: #667386;
-            font-size: 20px;
-        }
-
-        .checks {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .check {
-            background: #090d13;
-            padding: 12px;
-            border-radius: 7px;
-            font-size: 13px;
-        }
-
-        .yes {
-            color: #35d07f;
-        }
-
-        .no {
-            color: #7f8a9b;
-        }
-
-        .response {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-        }
-
-        .response-box {
-            background: #090d13;
-            border-radius: 7px;
-            padding: 14px;
-        }
-
-        .events {
-            max-height: 360px;
-            overflow-y: auto;
-            background: #090d13;
-            border-radius: 8px;
-        }
-
-        .event {
-            padding: 10px 14px;
-            border-bottom: 1px solid #171d27;
-            font-family: monospace;
-            font-size: 12px;
-            color: #b8c2d1;
-        }
-
-        .empty {
-            color: #687487;
-            text-align: center;
-            padding: 50px 20px;
-        }
-
-        @media (max-width: 1000px) {
-            .services {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .grid {
-                grid-template-columns: 1fr;
-            }
-
-            .response {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        @media (max-width: 600px) {
-            .services {
-                grid-template-columns: 1fr;
-            }
-
-            .details,
-            .checks,
-            .response {
-                grid-template-columns: 1fr;
-            }
-
-            .container {
-                padding: 16px;
-            }
-
-            .header {
-                padding: 20px 16px;
-            }
-        }
-    </style>
+    /* banner */
+    .drb{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--amber);display:flex;align-items:center;gap:8px}
+    .sbar-w{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:8px}
+    .sbar-f{height:100%;border-radius:2px;transition:width .4s ease}
+    .es{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--txt-m);font-size:12px;padding:30px}
+  </style>
 </head>
-
 <body>
+<div id="app">
 
-<header class="header">
-    <div class="title">SecMLOps — Autonomous Cyber Defense</div>
-    <div class="subtitle">
-        eBPF Telemetry • Temporal Graph Analysis • Context Validation • Controlled Containment
+  <!-- TOPBAR -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-logo">🛡️</div>
+      <div>
+        <div class="brand-name">SecMLOps</div>
+        <div class="brand-sub">Security Operations Center</div>
+      </div>
     </div>
-</header>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div id="status-badge" class="b-mon">
+        <span class="dot dot-p" id="sb-dot" style="background:var(--green)"></span>
+        <span id="sb-txt">MONITORING</span>
+      </div>
+      <span id="last-upd">—</span>
+    </div>
+  </header>
 
-<main class="container">
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="s-sect">Navigation</div>
+    <div class="nav act" id="nav-ov"   onclick="sv('ov')"><span class="nav-ic">⬛</span><span>Overview</span></div>
+    <div class="nav"     id="nav-gr"   onclick="sv('gr')"><span class="nav-ic">◈</span><span>Attack Graph</span></div>
+    <div class="nav"     id="nav-ag"   onclick="sv('ag')"><span class="nav-ic">🤖</span><span>AI Investigation</span><span class="nav-badge" id="ag-badge" style="display:none">1</span></div>
+    <div class="s-div"></div>
+    <div class="nav"     id="nav-sim"  onclick="sv('sim')"><span class="nav-ic">⚗</span><span>Simulation Lab</span></div>
 
-    <!-- SERVICES -->
-    <section class="services">
+    <div id="sb-health">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:var(--txt-m);text-transform:uppercase;margin-bottom:4px">Infrastructure</div>
+      <div class="svc-row"><span class="svc-n">K3s Cluster</span><span id="d-k3s" class="sdot s-unk" title="—"></span></div>
+      <div class="svc-row"><span class="svc-n">Tetragon Sensor</span><span id="d-tet" class="sdot s-unk" title="—"></span></div>
+      <div class="svc-row"><span class="svc-n">Kafka <small style="color:var(--txt-m)">(Opt)</small></span><span id="d-kfk" class="sdot s-unk" title="—"></span></div>
+      <div class="svc-row"><span class="svc-n">Neo4j <small style="color:var(--txt-m)">(Opt)</small></span><span id="d-neo" class="sdot s-unk" title="—"></span></div>
+    </div>
+  </nav>
 
-        <div class="service">
-            <div class="service-name">K3s</div>
-            <div id="k3s-status" class="service-status offline">
-                ● OFFLINE
-            </div>
+  <!-- MAIN VIEWPORT -->
+  <main id="main">
+
+    <!-- 1. OVERVIEW VIEW -->
+    <section id="v-ov" class="view act">
+      <div class="stk">
+
+        <!-- Metrics Row -->
+        <div class="g4">
+          <div class="mb"><div class="ml">Status</div><div id="ov-st" class="mv sm cg">MONITORING</div></div>
+          <div class="mb"><div class="ml">Attack Type</div><div id="ov-at" class="mv sm mono cm">—</div></div>
+          <div class="mb"><div class="ml">Risk Score</div><div id="ov-rs" class="mv cm">—</div><div class="sbar-w"><div id="ov-rb" class="sbar-f" style="width:0;background:var(--green)"></div></div></div>
+          <div class="mb"><div class="ml">Severity</div><div id="ov-sev"></div></div>
         </div>
 
-        <div class="service">
-            <div class="service-name">Tetragon / eBPF</div>
-            <div id="tetragon-status" class="service-status offline">
-                ● OFFLINE
+        <!-- Infrastructure Health Panel with clear Optional labels -->
+        <div class="panel">
+          <div class="ph"><span class="pt">Infrastructure Health</span><span id="h-upd" class="cs" style="font-size:11px"></span></div>
+          <div class="g4">
+            <div class="mb">
+              <div class="ml">K3s Cluster</div>
+              <div id="h-k3s" class="mv sm cm">—</div>
+              <div style="font-size:10px;color:var(--txt-m);margin-top:4px">Control plane ready</div>
             </div>
+            <div class="mb">
+              <div class="ml">Tetragon / eBPF</div>
+              <div id="h-tet" class="mv sm cm">—</div>
+              <div style="font-size:10px;color:var(--txt-m);margin-top:4px">Sensor & policies active</div>
+            </div>
+            <div class="mb">
+              <div class="ml">Kafka <span style="font-size:9px;color:var(--txt-m);font-weight:400">(Optional)</span></div>
+              <div id="h-kfk" class="mv sm cm">—</div>
+              <div style="font-size:10px;color:var(--txt-m);margin-top:4px">Direct eBPF mode active</div>
+            </div>
+            <div class="mb">
+              <div class="ml">Neo4j <span style="font-size:9px;color:var(--txt-m);font-weight:400">(Optional)</span></div>
+              <div id="h-neo" class="mv sm cm">—</div>
+              <div style="font-size:10px;color:var(--txt-m);margin-top:4px">In-memory graph active</div>
+            </div>
+          </div>
         </div>
 
-        <div class="service">
-            <div class="service-name">Kafka</div>
-            <div id="kafka-status" class="service-status offline">
-                ● OFFLINE
+        <!-- AI Agent Banner on Overview -->
+        <div class="panel" style="border:1px solid rgba(0,212,255,0.3);background:linear-gradient(135deg,rgba(0,212,255,0.06),rgba(13,20,31,0.95));padding:14px 18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:34px;height:34px;border-radius:8px;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);display:flex;align-items:center;justify-content:center;font-size:17px">🤖</div>
+              <div>
+                <div style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--cyan);text-transform:uppercase">Security Agent Decision</div>
+                <div id="ov-ag-asm" style="font-size:13px;font-weight:600;color:var(--txt);margin-top:2px">Monitoring cluster telemetry — ready to investigate incidents.</div>
+              </div>
             </div>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="font-size:11px;color:var(--txt-s)">Recommendation: <strong id="ov-ag-act" style="color:var(--cyan);font-family:var(--mono)">—</strong></div>
+              <div style="font-size:11px;color:var(--txt-s)">Priority: <strong id="ov-ag-pri">—</strong></div>
+              <div style="font-size:11px;color:var(--txt-s)">Safety Gate: <strong id="ov-ag-gate">—</strong></div>
+              <button class="btn btn-p" style="font-size:11px;padding:5px 12px" onclick="sv('ag')">View Full Investigation →</button>
+            </div>
+          </div>
         </div>
 
-        <div class="service">
-            <div class="service-name">Neo4j</div>
-            <div id="neo4j-status" class="service-status offline">
-                ● OFFLINE
+        <!-- Detection Details & Response Lifecycle -->
+        <div class="g2">
+          <div class="panel">
+            <div class="ph"><span class="pt">Detection Details</span></div>
+            <div class="stk" style="gap:8px">
+              <div class="mb"><div class="ml">Target Pod</div><div id="ov-tgt" class="mv sm mono cm">—</div></div>
+              <div class="mb"><div class="ml">Namespace</div><div id="ov-ns" class="mv sm mono cm">—</div></div>
+              <div class="mb"><div class="ml">Sensitive File</div><div id="ov-fi" class="mv sm mono cm" style="font-size:12px;word-break:break-all">—</div></div>
+              <div class="mb"><div class="ml">Destination IP</div><div id="ov-ip" class="mv sm mono cm">—</div></div>
             </div>
+          </div>
+          <div class="panel">
+            <div class="ph"><span class="pt">Response Lifecycle</span></div>
+            <div class="stk" style="gap:10px">
+              <div id="ov-lc" class="lcs"></div>
+              <div class="mb"><div class="ml">Recommended Action</div><div id="ov-act" class="mv sm mono cm">—</div></div>
+              <div class="mb"><div class="ml">Safety Gate Decision</div><div id="ov-gate" class="mv sm cm">—</div></div>
+              <div class="mb">
+                <div class="ml">Execution Mode</div>
+                <div id="ov-em" class="mv sm ca">DRY-RUN (safe)</div>
+                <div style="font-size:10px;color:var(--txt-m);margin-top:4px">No workloads disrupted in dry-run mode</div>
+              </div>
+            </div>
+          </div>
         </div>
 
+        <!-- Temporal Attack Graph Card on Overview -->
+        <div class="panel" style="padding:20px 24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:#64748b;text-transform:uppercase">TEMPORAL ATTACK GRAPH</div>
+              <div id="ov-gr-target" style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#f8fafc;margin-top:4px">—</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span id="ov-gr-nc" class="cs" style="font-size:11px">—</span>
+              <span id="ov-gr-ec" class="cs" style="font-size:11px">—</span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="gcw-box" id="ov-gcw">
+            <div class="ge" id="ov-gr-empty">
+              <span style="font-size:36px;opacity:.4">◈</span>
+              <span>No incident graph</span>
+              <span style="font-size:11px">Run a simulation or trigger a detection</span>
+            </div>
+            <svg id="ov-gsvg" class="gsvg-el" style="display:none"></svg>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 6px 2px;border-top:1px solid #131b28;margin-top:12px;font-family:var(--mono);font-size:11px;color:#64748b">
+            <div style="display:flex;gap:18px;align-items:center">
+              <span><span style="color:#00d4ff">●</span> POD</span>
+              <span><span style="color:#a78bfa">●</span> PROCESS</span>
+              <span><span style="color:#f59e0b">●</span> FILE</span>
+              <span><span style="color:#f43f5e">●</span> NETWORK</span>
+            </div>
+            <div>CLICK A NODE TO TRACE ITS RELATIONSHIPS</div>
+          </div>
+        </div>
+
+        <!-- GNN & Context Validation -->
+        <div class="g2">
+          <div class="panel">
+            <div class="ph"><span class="pt">Temporal GNN</span><span id="gnn-b" class="pbadge" style="background:rgba(244,63,94,.1);color:var(--red);border-color:rgba(244,63,94,.25)">UNAVAILABLE</span></div>
+            <div class="g2">
+              <div class="mb"><div class="ml">Benign Prob.</div><div id="gnn-bp" class="mv cg">0.0000</div></div>
+              <div class="mb"><div class="ml">Suspicious Prob.</div><div id="gnn-sp" class="mv cr">0.0000</div></div>
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:var(--txt-m);line-height:1.5">⚠ Model output for this specific graph — not a calibrated real-world probability.</div>
+          </div>
+          <div class="panel">
+            <div class="ph"><span class="pt">Context Validation</span><span id="ctx-sc" class="pbadge" style="background:rgba(0,212,255,.08);color:var(--cyan);border-color:rgba(0,212,255,.2)">Score: —</span></div>
+            <div class="cg2">
+              <div id="ctx-sw"  class="ci fail">✗ Same Workload</div>
+              <div id="ctx-pa"  class="ci fail">✗ Process Ancestry</div>
+              <div id="ctx-tp"  class="ci fail">✗ Temporal Proximity</div>
+              <div id="ctx-sr"  class="ci fail">✗ Sensitive Resource</div>
+              <div id="ctx-nf"  class="ci fail">✗ Network Follow-up</div>
+              <div id="ctx-seq" class="ci fail">✗ Seq. Consistent</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Log -->
+        <div class="panel">
+          <div class="ph"><span class="pt">Live Telemetry</span><span id="ev-cnt" class="cs" style="font-size:11px">0 events</span></div>
+          <div id="ev-log" class="elog"><div class="es"><span class="es-ic">📡</span><span class="es-tx">Waiting for telemetry...</span></div></div>
+        </div>
+      </div>
     </section>
 
-
-    <section class="grid">
-
-        <!-- THREAT STATUS -->
-        <div class="card">
-            <h2>Threat Status</h2>
-
-            <div id="threat-status" class="threat-status status-monitoring">
-                MONITORING
+    <!-- 2. ATTACK GRAPH VIEW -->
+    <section id="v-gr" class="view">
+      <div class="stk">
+        <div class="panel" style="padding:20px 24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:#64748b;text-transform:uppercase">TEMPORAL ATTACK GRAPH</div>
+              <div id="gr-target-name" style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:#f8fafc;margin-top:4px">—</div>
             </div>
-
-            <div class="details">
-
-                <div class="detail">
-                    <div class="label">Attack Type</div>
-                    <div id="attack-type" class="value">—</div>
-                </div>
-
-                <div class="detail">
-                    <div class="label">Target</div>
-                    <div id="target" class="value">—</div>
-                </div>
-
-                <div class="detail">
-                    <div class="label">Risk Score</div>
-                    <div id="risk-score" class="value">—</div>
-                </div>
-
-                <div class="detail">
-                    <div class="label">Severity</div>
-                    <div id="severity" class="value">—</div>
-                </div>
-
+            <div style="display:flex;align-items:center;gap:12px">
+              <span id="gr-nc" class="cs" style="font-size:11px">—</span>
+              <span id="gr-ec" class="cs" style="font-size:11px">—</span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
             </div>
+          </div>
+          <div class="gcw-box" id="gcw">
+            <div class="ge" id="gr-empty">
+              <span style="font-size:36px;opacity:.4">◈</span>
+              <span>No incident graph</span>
+              <span style="font-size:11px">Run a simulation or trigger a detection</span>
+            </div>
+            <svg id="gsvg" class="gsvg-el" style="display:none"></svg>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 6px 2px;border-top:1px solid #131b28;margin-top:12px;font-family:var(--mono);font-size:11px;color:#64748b">
+            <div style="display:flex;gap:18px;align-items:center">
+              <span><span style="color:#00d4ff">●</span> POD</span>
+              <span><span style="color:#a78bfa">●</span> PROCESS</span>
+              <span><span style="color:#f59e0b">●</span> FILE</span>
+              <span><span style="color:#f43f5e">●</span> NETWORK</span>
+            </div>
+            <div>CLICK A NODE TO TRACE ITS RELATIONSHIPS</div>
+          </div>
         </div>
 
-
-        <!-- GNN -->
-        <div class="card">
-
-            <h2>Temporal GNN</h2>
-
-            <div class="details">
-
-                <div class="detail">
-                    <div class="label">Available</div>
-                    <div id="gnn-available" class="value">✗ NO</div>
-                </div>
-
-                <div class="detail">
-                    <div class="label">Prediction</div>
-                    <div id="gnn-prediction" class="value">BENIGN</div>
-                </div>
-
-            </div>
-
-            <br>
-
-            <div class="probabilities">
-
-                <div class="prob">
-                    <div class="label">Benign Probability</div>
-                    <div id="benign-prob" class="prob-value">0.0000</div>
-                </div>
-
-                <div class="prob">
-                    <div class="label">Suspicious Probability</div>
-                    <div id="suspicious-prob" class="prob-value">0.0000</div>
-                </div>
-
-            </div>
-
+        <div class="panel">
+          <div class="ph"><span class="pt">Attack Chain Timeline</span></div>
+          <div id="ac-list"><div class="es"><span class="es-ic">🔗</span><span class="es-tx">No attack chain</span></div></div>
         </div>
 
-
-        <!-- GRAPH -->
-        <div class="card full">
-
-            <h2>Temporal Attack Graph</h2>
-
-            <div id="graph" class="graph">
-                <div class="empty">
-                    Waiting for detection...
-                </div>
-            </div>
-
+        <div class="panel">
+          <div class="ph"><span class="pt">Graph Event Timeline</span></div>
+          <div id="gr-evlog" class="elog" style="max-height:200px"><div class="es" style="padding:20px"><span class="es-tx">No events</span></div></div>
         </div>
-
-
-        <!-- CONTEXT -->
-        <div class="card">
-
-            <h2>Context Validation</h2>
-
-            <div class="checks">
-
-                <div id="same-workload" class="check no">
-                    ✗ Same Workload
-                </div>
-
-                <div id="process-ancestry" class="check no">
-                    ✗ Process Ancestry
-                </div>
-
-                <div id="temporal-proximity" class="check no">
-                    ✗ Temporal Proximity
-                </div>
-
-                <div id="sensitive-resource" class="check no">
-                    ✗ Sensitive Resource
-                </div>
-
-                <div id="network-followup" class="check no">
-                    ✗ Network Follow-up
-                </div>
-
-                <div id="sequence-consistent" class="check no">
-                    ✗ Sequence Consistent
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- RESPONSE -->
-        <div class="card">
-
-            <h2>Security Response</h2>
-
-            <div class="response">
-
-                <div class="response-box">
-                    <div class="label">Agent Priority</div>
-                    <div id="agent-priority" class="value">—</div>
-                </div>
-
-                <div class="response-box">
-                    <div class="label">Recommended Action</div>
-                    <div id="recommended-action" class="value">—</div>
-                </div>
-
-                <div class="response-box">
-                    <div class="label">Safety Gate</div>
-                    <div id="safety-gate" class="value">✗ BLOCKED</div>
-                </div>
-
-                <div class="response-box">
-                    <div class="label">Containment</div>
-                    <div id="containment" class="value">✗ FAILED</div>
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <!-- TELEMETRY -->
-        <div class="card full">
-
-            <h2>Live Telemetry</h2>
-
-            <div id="events" class="events">
-
-                <div class="empty">
-                    Waiting for telemetry...
-                </div>
-
-            </div>
-
-        </div>
-
+      </div>
     </section>
 
-</main>
+    <!-- 3. AI INVESTIGATION VIEW -->
+    <section id="v-ag" class="view">
+      <div class="stk">
+        <div class="drb">⚠️ <strong>DRY-RUN SAFETY ACTIVE</strong> — Actions are recommendations approved by policy. No cluster pods will be terminated.</div>
+        <div class="panel">
+          <div class="ph"><span class="pt">Response Lifecycle</span></div>
+          <div id="ag-lc" class="lcs"></div>
+          <div class="g4" style="margin-top:10px">
+            <div class="mb"><div class="ml">Priority</div><div id="ag-pri" class="mv sm cm">—</div></div>
+            <div class="mb"><div class="ml">Recommended Action</div><div id="ag-act" class="mv sm mono cm">—</div></div>
+            <div class="mb"><div class="ml">Safety Gate</div><div id="ag-gate" class="mv sm cm">—</div></div>
+            <div class="mb"><div class="ml">Execution Mode</div><div id="ag-em" class="mv sm ca">DRY-RUN</div></div>
+          </div>
+        </div>
 
+        <div class="panel">
+          <div class="ph"><span class="pt">Agent Assessment</span></div>
+          <div id="ag-asm" style="font-size:13px;font-weight:600;color:var(--txt);margin-bottom:14px">—</div>
+          <div id="ag-rsn" class="evl"></div>
+        </div>
+
+        <div class="g2">
+          <div class="panel"><div class="ph"><span class="pt">🔍 Observed Facts</span></div><div id="ag-fac" class="evl"><div class="es" style="padding:20px"><span class="es-tx">No facts recorded</span></div></div></div>
+          <div class="panel"><div class="ph"><span class="pt">◈ Graph Evidence</span></div><div id="ag-gev" class="evl"><div class="es" style="padding:20px"><span class="es-tx">No graph evidence</span></div></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><span class="pt">⚠ Uncertainty / Missing Evidence</span></div>
+          <div id="ag-unc" class="evl"><div class="es" style="padding:20px"><span class="es-tx">No uncertainty flags — evidence complete</span></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><span class="pt">🎯 Response Options Considered</span></div>
+          <div id="ag-opts" class="g2" style="gap:12px"><div class="es" style="padding:20px"><span class="es-tx">No options yet</span></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><span class="pt">🔐 Safety Gate Decision</span></div>
+          <div class="g3" style="gap:10px">
+            <div class="mb"><div class="ml">Decision</div><div id="ag-gd" class="mv sm cm">—</div></div>
+            <div class="mb"><div class="ml">Gate Action</div><div id="ag-ga" class="mv sm mono cm">—</div></div>
+            <div class="mb"><div class="ml">Reason</div><div id="ag-gr" class="mv sm cm" style="font-size:11px;word-break:break-word">—</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. SIMULATION LAB VIEW -->
+    <section id="v-sim" class="view">
+      <div class="stk">
+        <div class="drb">⚗ <strong>Simulation Lab</strong> — Safe, repeatable scenarios. All actions remain strictly dry-run.</div>
+        <div class="panel">
+          <div class="ph"><span class="pt">Available Scenarios</span></div>
+          <div class="sim-g">
+            <div class="simc">
+              <div class="sim-n">Scenario 1 — Multi-Stage Attack</div>
+              <div class="sim-d">Sensitive file access followed by outbound network connection from the same pod. Tests the complete detection, GNN inference, and agent containment recommendation.</div>
+              <div class="sim-m"><span class="sim-tag">File Read</span><span class="sim-tag">Network Exfil</span><span class="sim-tag">CRITICAL</span></div>
+              <div class="sim-f"><span style="font-size:11px;color:var(--txt-m)">Tests full pipeline</span><button class="btn btn-p" onclick="runSim('MULTI_STAGE')">▶ Run</button></div>
+            </div>
+            <div class="simc">
+              <div class="sim-n">Scenario 2 — Suspicious Process Chain</div>
+              <div class="sim-d">Suspicious parent→child process execution without file or network activity. Tests evidence-based abstention (recommends monitoring rather than isolation).</div>
+              <div class="sim-m"><span class="sim-tag">Process Exec</span><span class="sim-tag">Partial Evidence</span><span class="sim-tag">MEDIUM</span></div>
+              <div class="sim-f"><span style="font-size:11px;color:var(--txt-m)">Tests abstention path</span><button class="btn btn-n" onclick="runSim('PROC_CHAIN')">▶ Run</button></div>
+            </div>
+            <div class="simc">
+              <div class="sim-n">Scenario 3 — Benign Baseline</div>
+              <div class="sim-d">Normal workload with routine process execution. Validates the system produces zero false positives for benign cluster activity.</div>
+              <div class="sim-m"><span class="sim-tag">Benign</span><span class="sim-tag">No Alert</span><span class="sim-tag">LOW</span></div>
+              <div class="sim-f"><span style="font-size:11px;color:var(--txt-m)">Should produce NO_ACTION</span><button class="btn btn-n" onclick="runSim('BENIGN')">▶ Run</button></div>
+            </div>
+            <div class="simc">
+              <div class="sim-n">Scenario 4 — Protected Target (Gate Block)</div>
+              <div class="sim-d">High-risk detection targeting a pod in the protected <code>kube-system</code> namespace. Safety gate blocks isolation to preserve cluster integrity.</div>
+              <div class="sim-m"><span class="sim-tag">Protected NS</span><span class="sim-tag">Gate Block</span><span class="sim-tag">CRITICAL</span></div>
+              <div class="sim-f"><span style="font-size:11px;color:var(--txt-m)">Validates safety gate</span><button class="btn btn-d" onclick="runSim('GATE_BLOCK')">▶ Run</button></div>
+            </div>
+          </div>
+          <div style="margin-top:14px;display:flex;justify-content:flex-end">
+            <button class="btn btn-n" onclick="runSim('RESET')">↺ Reset to Clean Baseline</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><span class="pt">Simulation Output</span><span id="sim-sb" class="cs" style="font-size:11px">idle</span></div>
+          <div id="sim-out">Run a scenario to see the simulation result.</div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><span class="pt">Run History</span><button class="btn btn-n" style="font-size:10px;padding:2px 8px" onclick="clearHist()">Clear</button></div>
+          <div id="sim-hist"><div class="es"><span class="es-ic">📋</span><span class="es-tx">No runs yet</span></div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
 
 <script>
+const $ = id => document.getElementById(id);
+const views = ['ov','gr','ag','sim'];
+let selectedNodeId = null;
 
-function setService(name, online) {
+function sv(v){
+  views.forEach(k=>{
+    const el = $('v-'+k), nav = $('nav-'+k);
+    if(el) el.classList.toggle('act', k===v);
+    if(nav) nav.classList.toggle('act', k===v);
+  });
+}
 
-    const element = document.getElementById(name + "-status");
+function esc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function st(id,v,fb='—'){const e=$(id);if(!e)return;e.textContent=(v!==null&&v!==undefined&&v!=='')? v:fb;}
+function sh(id,h){const e=$(id);if(e)e.innerHTML=h;}
+function fts(ts){if(!ts)return'—';try{return new Date(ts).toLocaleTimeString('en-GB',{hour12:false});}catch{return ts;}}
+function fRisk(n){
+  if(n===null||n===undefined)return{c:'var(--txt-m)',w:0};
+  if(n>=80)return{c:'var(--red)',w:n};if(n>=60)return{c:'var(--amber)',w:n};
+  if(n>=30)return{c:'var(--blue)',w:n};return{c:'var(--green)',w:n};
+}
+function sevPill(s){
+  if(!s)return'<span class="cm">—</span>';
+  const m={CRITICAL:'sc',HIGH:'sh',MEDIUM:'sm2',LOW:'sl'};
+  return`<span class="sev ${m[s]||'sl'}">${esc(s)}</span>`;
+}
 
-    if (!element) {
-        return;
+// ── health ───────────────────────────────────────────────────────────────────
+async function pollHealth(){
+  try{const r=await fetch('/api/health');if(!r.ok)throw 0;renderHealth(await r.json());}
+  catch{renderHealth({k3s:'OFFLINE',tetragon:'OFFLINE',kafka:'NOT_CONFIGURED',neo4j:'NOT_CONFIGURED'});}
+}
+function renderHealth(d){
+  setH('k3s', d.k3s); setH('tetragon', d.tetragon);
+  setH('kafka', d.kafka==='OFFLINE'?'NOT_CONFIGURED':d.kafka);
+  setH('neo4j', d.neo4j==='OFFLINE'?'NOT_CONFIGURED':d.neo4j);
+  st('h-upd','Updated '+new Date().toLocaleTimeString());
+}
+function setH(k,s){
+  const cls = s==='ONLINE'?'s-on':s==='NOT_CONFIGURED'?'s-nc':'s-off';
+  const idk = {k3s:'d-k3s',tetragon:'d-tet',kafka:'d-kfk',neo4j:'d-neo'}[k];
+  const idk2 = {k3s:'h-k3s',tetragon:'h-tet',kafka:'h-kfk',neo4j:'h-neo'}[k];
+  const dot=$(idk);if(dot){dot.className='sdot '+cls;dot.title=s;}
+  const txt=$(idk2);if(txt){txt.textContent=s;txt.className='mv sm '+(s==='ONLINE'?'cg':s==='NOT_CONFIGURED'?'ca':'cr');}
+}
+
+// ── state ────────────────────────────────────────────────────────────────────
+async function pollState(){
+  try{const r=await fetch('/api/threat');if(!r.ok)return;renderState(await r.json());}
+  catch{}
+}
+function renderState(d){
+  if(!d)return;
+  const status=d.status||'MONITORING';
+  const agent=d.agent||{};
+  const gate=d.safety_gate||null;
+  const ctx=d.context||{};
+  const gnn=d.gnn||{};
+  const threat=d.threat||{};
+
+  // Format status nicely for user
+  let stLabel = status.replaceAll('_',' ');
+  if (status === 'CONTAINMENT_APPROVED' || status === 'DETECTED_NO_CONTAINMENT') {
+    stLabel = 'CONTAINMENT APPROVED (DRY-RUN)';
+  } else if (status === 'SAFETY_GATE_BLOCKED' || status === 'CONTAINMENT_BLOCKED') {
+    stLabel = 'CONTAINMENT BLOCKED (SAFETY GATE)';
+  }
+
+  // topbar badge
+  const sb=$('status-badge'), sbt=$('sb-txt'), sbd=$('sb-dot');
+  sbt.textContent = stLabel;
+  if(status==='MONITORING'){
+    sb.className='b-mon'; sbd.style.background='var(--green)';
+  } else if(status==='ANALYZING_RESPONSE'||status==='SAFETY_GATE'){
+    sb.className='b-ana'; sbd.style.background='var(--amber)';
+  } else {
+    sb.className='b-thr'; sbd.style.background='var(--red)';
+  }
+  st('last-upd',d.updated_at?'Updated '+fts(d.updated_at):'—');
+
+  // overview metrics
+  const ovst=$('ov-st');
+  if(ovst){
+    ovst.textContent = stLabel;
+    ovst.className='mv sm '+(status==='MONITORING'?'cg':status.includes('BLOCKED')?'ca':'cr');
+  }
+  st('ov-at',d.attack_type);
+  const rs=d.risk_score;
+  const rf=fRisk(rs);
+  const rsel=$('ov-rs');if(rsel){rsel.textContent=rs!==null&&rs!==undefined?rs:'—';rsel.style.color=rf.c;}
+  const rbr=$('ov-rb');if(rbr){rbr.style.width=rf.w+'%';rbr.style.background=rf.c;}
+  sh('ov-sev',rs!==null&&rs!==undefined?sevPill(d.severity):'<span class="mv sm cm">—</span>');
+
+  st('ov-tgt',d.target||threat.pod);
+  st('ov-ns',threat.namespace||d.namespace);
+  st('ov-fi',threat.file||d.file);
+  st('ov-ip',threat.destination_ip||d.destination_ip);
+
+  const lch=buildLC(status,agent,gate);
+  sh('ov-lc',lch); sh('ag-lc',lch);
+
+  st('ov-act',agent.recommended_action);
+  const gsum=gSummary(gate);
+  st('ov-gate',gsum);const og=$('ov-gate');if(og)og.style.color=gColor(gate);
+  st('ov-em',(agent.execution_mode||'DRY_RUN')==='DRY_RUN'?'DRY-RUN (safe)':agent.execution_mode);
+
+  // Overview AI Agent Banner
+  if (agent && agent.assessment) {
+    st('ov-ag-asm', agent.assessment);
+    st('ov-ag-act', agent.recommended_action);
+    const oap = $('ov-ag-pri');
+    if (oap) {
+      oap.textContent = agent.priority || '—';
+      oap.className = {CRITICAL:'cr',HIGH:'ca',MEDIUM:'cb',LOW:'cg'}[agent.priority] || 'cm';
     }
+    const oag = $('ov-ag-gate');
+    if (oag) {
+      oag.textContent = gsum;
+      oag.style.color = gColor(gate);
+    }
+  }
 
-    if (online) {
-        element.textContent = "● ONLINE";
-        element.className = "service-status online";
+  // GNN
+  const gok=gnn.available===true;
+  const gnb=$('gnn-b');
+  if(gnb){gnb.textContent=gok?'AVAILABLE':'UNAVAILABLE';Object.assign(gnb.style,gok?{background:'rgba(34,216,122,.1)',color:'var(--green)',borderColor:'rgba(34,216,122,.25)'}:{background:'rgba(244,63,94,.1)',color:'var(--red)',borderColor:'rgba(244,63,94,.25)'});}
+  st('gnn-bp',gok?Number(gnn.benign_probability).toFixed(4):'—');
+  st('gnn-sp',gok?Number(gnn.suspicious_probability).toFixed(4):'—');
+
+  // context checks
+  renderCtx(ctx);
+
+  // agent view
+  renderAgent(agent,gate);
+
+  // badge in sidebar
+  const ab=$('ag-badge');if(ab)ab.style.display=(status!=='MONITORING')?'inline-block':'none';
+}
+
+function buildLC(status,agent,gate){
+  const steps=[{k:'DET',l:'Detected'},{k:'ANL',l:'Analyzed'},{k:'GAT',l:'Gate'},{k:'EXC',l:'Execution'},{k:'VER',l:'Verified'}];
+  const done=new Set();
+  if(status!=='MONITORING')done.add('DET');
+  if(agent&&agent.recommended_action)done.add('ANL');
+  if(gate&&gate.approved!==undefined)done.add('GAT');
+  if(status.includes('CONTAINED')||status.includes('APPROVED'))done.add('EXC');
+  let h='';
+  steps.forEach((s,i)=>{
+    if(i>0)h+='<span class="lc-arr">→</span>';
+    let c='lcs-s';
+    if(done.has(s.k)){
+      c+= s.k==='GAT'&&gate&&gate.approved===false?' warn':' done';
+    }
+    h+=`<div class="${c}">${esc(s.l)}</div>`;
+  });
+  return h;
+}
+
+function gSummary(g){
+  if(!g)return'—';
+  if(g===true)return'✓ APPROVED';if(g===false)return'✗ BLOCKED';
+  if(g.approved===true)return'✓ APPROVED';if(g.approved===false)return'✗ BLOCKED';
+  return'—';
+}
+function gColor(g){
+  if(!g)return'var(--txt-m)';
+  const a=g===true||(g&&g.approved===true);const b=g===false||(g&&g.approved===false);
+  return a?'var(--green)':b?'var(--red)':'var(--txt-m)';
+}
+
+function renderCtx(ctx){
+  [['ctx-sw',ctx.same_workload,'Same Workload'],['ctx-pa',ctx.process_ancestry,'Process Ancestry'],
+   ['ctx-tp',ctx.temporal_proximity,'Temporal Proximity'],['ctx-sr',ctx.sensitive_resource,'Sensitive Resource'],
+   ['ctx-nf',ctx.network_followup??ctx.network_follow_up,'Network Follow-up'],
+   ['ctx-seq',ctx.sequence_consistent,'Seq. Consistent']].forEach(([id,v,l])=>{
+    const e=$(id);if(!e)return;e.className='ci '+(v?'pass':'fail');e.innerHTML=(v?'✓ ':'✗ ')+esc(l);
+  });
+  const sc=(ctx.context_score!==undefined&&ctx.context_score!==null)?(Number(ctx.context_score)*100).toFixed(0)+'%':'—';
+  st('ctx-sc','Score: '+sc);
+}
+
+function renderAgent(ag,gate){
+  if(!ag||!ag.assessment){sh('ag-asm','<span class="cm">No agent analysis yet</span>');return;}
+  st('ag-asm',ag.assessment);
+  const pc={CRITICAL:'cr',HIGH:'ca',MEDIUM:'cb',LOW:'cg'}[ag.priority]||'cm';
+  const apri=$('ag-pri');if(apri){apri.textContent=ag.priority||'—';apri.className='mv sm '+pc;}
+  st('ag-act',ag.recommended_action);
+  const gt=$('ag-gate');if(gt){gt.textContent=gSummary(gate);gt.style.color=gColor(gate);}
+  st('ag-em',(ag.execution_mode||'DRY_RUN')==='DRY_RUN'?'DRY-RUN (safe)':ag.execution_mode);
+
+  // reasoning
+  sh('ag-rsn',(ag.reasoning||[]).map(r=>`<div class="evi ef"><span class="ev-ic" style="color:var(--blue)">›</span><span class="ev-tx">${esc(r)}</span></div>`).join('')||'');
+
+  // observed facts
+  sh('ag-fac',(ag.observed_facts||[]).map(f=>`<div class="evi ef"><span class="ev-ic" style="color:var(--blue)">●</span><span class="ev-tx">${esc(f)}</span></div>`).join('')
+    ||'<div class="es" style="padding:14px"><span class="es-tx">No facts recorded</span></div>');
+
+  // graph evidence
+  sh('ag-gev',(ag.graph_evidence||[]).map(e=>`<div class="evi eg"><span class="ev-ic" style="color:var(--green)">◈</span><span class="ev-tx">${esc(e)}</span></div>`).join('')
+    ||'<div class="es" style="padding:14px"><span class="es-tx">No graph evidence</span></div>');
+
+  // uncertainty
+  sh('ag-unc',(ag.uncertainty||[]).map(u=>`<div class="evi eu"><span class="ev-ic" style="color:var(--amber)">⚠</span><span class="ev-tx">${esc(u)}</span></div>`).join('')
+    ||'<div class="es" style="padding:14px"><span class="es-tx">No uncertainty flags — evidence complete</span></div>');
+
+  // response options
+  const opts=ag.response_options||[];
+  const rec=ag.recommended_action;
+  sh('ag-opts',opts.length===0
+    ?'<div class="es" style="padding:14px"><span class="es-tx">No options</span></div>'
+    :opts.map(o=>{
+      const sel=o.action===rec||o.maps_to===rec;
+      return`<div class="opc${sel?' sel':''}">
+        <div class="op-act" style="color:${sel?'var(--cyan)':'var(--txt)'}">${sel?'★ ':''}${esc(o.action)}${o.maps_to&&o.maps_to!==o.action?` <span style="color:var(--txt-m);font-weight:400">→ ${esc(o.maps_to)}</span>`:''}</div>
+        <div class="op-row"><span class="op-rl">Rationale</span><span class="op-rv">${esc(o.rationale)}</span></div>
+        <div class="op-row"><span class="op-rl">Benefit</span><span class="op-rv">${esc(o.expected_benefit)}</span></div>
+        <div class="op-row"><span class="op-rl">Risk</span><span class="op-rv">${esc(o.operational_risk)}</span></div>
+      </div>`;
+    }).join(''));
+
+  // safety gate details
+  if(gate&&typeof gate==='object'){
+    const a=gate.approved===true;
+    const gd=$('ag-gd');st('ag-gd',a?'✓ APPROVED':'✗ BLOCKED');if(gd)gd.style.color=a?'var(--green)':'var(--red)';
+    st('ag-ga',gate.action); st('ag-gr',gate.reason);
+  } else {st('ag-gd','—');st('ag-ga','—');st('ag-gr','—');}
+}
+
+// ── events ───────────────────────────────────────────────────────────────────
+async function pollEvents(){
+  try{const r=await fetch('/api/events');if(!r.ok)return;const d=await r.json();
+    const ev=d.events||[];renderEvLog(ev,'ev-log');renderEvLog(ev,'gr-evlog');
+    st('ev-cnt',ev.length+' events');
+  }catch{}
+}
+function renderEvLog(events,cid){
+  const el=$(cid);if(!el)return;
+  if(!events.length){el.innerHTML='<div class="es" style="padding:20px"><span class="es-ic">📡</span><span class="es-tx">Waiting for events...</span></div>';return;}
+  el.innerHTML=[...events].slice(-30).reverse().map(ev=>{
+    let det=esc(ev.process||'');
+    if(ev.file_path) det+=` <span style="color:var(--amber)">→ ${esc(ev.file_path)}</span>`;
+    if(ev.destination_ip) det+=` <span style="color:var(--red)">→ ${esc(ev.destination_ip)}</span>`;
+    return`<div class="erow"><span class="ets">${esc(fts(ev.timestamp))}</span><span class="ety ${esc(ev.event_type||'')}">${esc(ev.event_type||'?')}</span><span class="edet">${det}</span></div>`;
+  }).join('');
+}
+
+// ── GRAPH (High-Fidelity Bezier Layout) ───────────────────────────────────────
+async function pollGraph(){
+  try{const r=await fetch('/api/graph');if(!r.ok)return;renderGraph(await r.json());}catch{}
+}
+
+function renderGraph(d){
+  const hasData = d && d.has_incident && d.nodes && d.nodes.length;
+  const targetLabel = (d.namespace || 'security-lab') + '/' + (d.target || 'secmlops-attack2');
+
+  ['', 'ov-'].forEach(prefix => {
+    const empty = $(prefix + 'gr-empty');
+    const svg = $(prefix + 'gsvg');
+    const tgt = $(prefix + 'gr-target') || $('gr-target-name');
+    const nc = $(prefix + 'gr-nc');
+    const ec = $(prefix + 'gr-ec');
+
+    if (tgt) tgt.textContent = targetLabel;
+
+    if (!hasData) {
+      if (empty) empty.style.display = 'flex';
+      if (svg) svg.style.display = 'none';
+      if (nc) nc.textContent = '—';
+      if (ec) ec.textContent = '—';
     } else {
-        element.textContent = "● OFFLINE";
-        element.className = "service-status offline";
+      if (empty) empty.style.display = 'none';
+      if (svg) svg.style.display = 'block';
+      if (nc) nc.textContent = d.nodes.length + ' nodes';
+      if (ec) ec.textContent = d.edges.length + ' edges';
+      drawGraphToSvg(d.nodes, d.edges, prefix + 'gsvg');
     }
+  });
+
+  const chain=d.attack_chain||[];
+  sh('ac-list',chain.length
+    ? chain.map((s,i)=>{
+        const[src,rel,tgt]=Array.isArray(s)?s:[s.source,s.relationship,s.target];
+        const rc={SPAWNED:'var(--blue)',READ:'var(--amber)',CONNECTED_TO:'var(--red)',RUNS:'var(--cyan)'}[rel]||'var(--txt-m)';
+        return`<div class="evi" style="font-family:var(--mono);font-size:11px"><span class="cm">${i+1}.</span> <span style="color:var(--txt)">${esc(src)}</span><span style="color:${rc};margin:0 6px">──[${esc(rel)}]──►</span><span style="color:var(--txt)">${esc(tgt)}</span></div>`;
+      }).join('')
+    : '<div class="es"><span class="es-tx">No attack chain</span></div>');
 }
 
-
-/*
- * IMPORTANT:
- * /api/health returns:
- *
- * {
- *   "k3s": "ONLINE",
- *   "tetragon": "ONLINE",
- *   "kafka": "ONLINE",
- *   "neo4j": "ONLINE"
- * }
- *
- * Therefore we must use lowercase keys.
- */
-async function updateHealth() {
-
-    try {
-
-        const response = await fetch("/api/health");
-
-        if (!response.ok) {
-            throw new Error("Health request failed");
-        }
-
-        const data = await response.json();
-
-        setService(
-            "k3s",
-            data.k3s === "ONLINE"
-        );
-
-        setService(
-            "tetragon",
-            data.tetragon === "ONLINE"
-        );
-
-        setService(
-            "kafka",
-            data.kafka === "ONLINE"
-        );
-
-        setService(
-            "neo4j",
-            data.neo4j === "ONLINE"
-        );
-
-    } catch (error) {
-
-        console.error("Health check error:", error);
-
-        setService("k3s", false);
-        setService("tetragon", false);
-        setService("kafka", false);
-        setService("neo4j", false);
-
-    }
-
-}
-
-
-function setText(id, value) {
-
-    const element = document.getElementById(id);
-
-    if (element) {
-        element.textContent =
-            value === undefined ||
-            value === null ||
-            value === ""
-                ? "—"
-                : value;
-    }
-
-}
-
-
-function setCheck(id, value, label) {
-
-    const element = document.getElementById(id);
-
-    if (!element) {
-        return;
-    }
-
-    if (value) {
-
-        element.textContent = "✓ " + label;
-        element.className = "check yes";
-
-    } else {
-
-        element.textContent = "✗ " + label;
-        element.className = "check no";
-
-    }
-
-}
-
-
-function updateThreat(data) {
-
-    if (!data) {
-        return;
-    }
-
-    const status =
-        data.status ||
-        data.threat_status ||
-        "MONITORING";
-
-    const statusElement =
-        document.getElementById("threat-status");
-
-    if (statusElement) {
-
-        statusElement.textContent =
-            String(status).replaceAll("_", " ");
-
-        statusElement.className =
-            status === "MONITORING"
-                ? "threat-status status-monitoring"
-                : "threat-status status-threat";
-
-    }
-
-
-    setText(
-        "attack-type",
-        data.attack_type ||
-        data.attackType
-    );
-
-    setText(
-        "target",
-        data.target ||
-        data.pod ||
-        data.workload
-    );
-
-    setText(
-        "risk-score",
-        data.risk_score ??
-        data.risk
-    );
-
-    setText(
-        "severity",
-        data.severity
-    );
-
-
-    const gnn =
-        data.gnn ||
-        data.temporal_gnn ||
-        {};
-
-    const gnnAvailable =
-        gnn.available ??
-        data.gnn_available ??
-        false;
-
-    setText(
-        "gnn-available",
-        gnnAvailable ? "✓ YES" : "✗ NO"
-    );
-
-    setText(
-        "gnn-prediction",
-        gnn.prediction ??
-        data.prediction ??
-        "BENIGN"
-    );
-
-    setText(
-        "benign-prob",
-        Number(
-            gnn.benign_probability ??
-            data.benign_probability ??
-            0
-        ).toFixed(4)
-    );
-
-    setText(
-        "suspicious-prob",
-        Number(
-            gnn.suspicious_probability ??
-            data.suspicious_probability ??
-            0
-        ).toFixed(4)
-    );
-
-
-    const context =
-        data.context ||
-        data.context_validation ||
-        {};
-
-    setCheck(
-        "same-workload",
-        context.same_workload,
-        "Same Workload"
-    );
-
-    setCheck(
-        "process-ancestry",
-        context.process_ancestry,
-        "Process Ancestry"
-    );
-
-    setCheck(
-        "temporal-proximity",
-        context.temporal_proximity,
-        "Temporal Proximity"
-    );
-
-    setCheck(
-        "sensitive-resource",
-        context.sensitive_resource,
-        "Sensitive Resource"
-    );
-
-    setCheck(
-        "network-followup",
-        context.network_follow_up ??
-        context.network_followup,
-        "Network Follow-up"
-    );
-
-    setCheck(
-        "sequence-consistent",
-        context.sequence_consistent,
-        "Sequence Consistent"
-    );
-
-
-    const response =
-        data.response ||
-        data.security_response ||
-        {};
-
-    setText(
-        "agent-priority",
-        response.priority ??
-        data.agent_priority
-    );
-
-    setText(
-        "recommended-action",
-        response.action ??
-        data.recommended_action
-    );
-
-
-    const safety =
-        data.safety_gate ??
-        response.safety_gate;
-
-    setText(
-        "safety-gate",
-        safety === true
-            ? "✓ APPROVED"
-            : safety === false
-                ? "✗ BLOCKED"
-                : "—"
-    );
-
-
-    const containment =
-        data.containment ||
-        {};
-
-    setText(
-        "containment",
-        containment.success === true
-            ? "✓ SUCCESS"
-            : containment.success === false
-                ? "✗ FAILED"
-                : "—"
-    );
-
-}
-
-
-async function updateState() {
-
-    try {
-
-        const response =
-            await fetch("/api/threat");
-
-        if (!response.ok) {
-            throw new Error("State request failed");
-        }
-
-        const data =
-            await response.json();
-
-        updateThreat(data);
-
-    } catch (error) {
-
-        console.error(
-            "State update error:",
-            error
-        );
-
-    }
-
-}
-
-
-function renderGraph(data) {
-
-    const graph =
-        document.getElementById("graph");
-
-    if (!graph) {
-        return;
-    }
-
-    if (!data || !data.has_incident || !data.nodes || !data.nodes.length) {
-
-        graph.innerHTML =
-            '<div class="empty">Waiting for detection...</div>';
-
-        return;
-
-    }
-
-    const nodes =
-        data.nodes ||
-        [];
-
-    const edges =
-        data.edges ||
-        [];
-
-    let html =
-        '<div class="graph-content">';
-
-    html +=
-        '<div class="graph-row">';
-
-    nodes.forEach(function(node, index) {
-
-        const label =
-            node.label ||
-            node.name ||
-            node.id ||
-            "Node";
-
-        const type =
-            node.type ||
-            "";
-
-        html +=
-            '<div class="node">' +
-                '<strong>' +
-                    escapeHtml(String(label)) +
-                '</strong><br>' +
-                '<small style="color:#8793a5;text-transform:uppercase;font-size:11px;">' +
-                    escapeHtml(String(type)) +
-                '</small>' +
-            '</div>';
-
-        if (index < nodes.length - 1) {
-
-            html +=
-                '<div class="arrow">→</div>';
-
-        }
-
+function drawGraphToSvg(nodes, edges, svgId){
+  const svg = $(svgId);
+  if (!svg) return;
+
+  const CW = 180, CH = 64, CR = 10;
+  const colX = { pod: 45, process: 330, file: 640, network: 640 };
+
+  const podNodes = nodes.filter(n => (n.type||'').toLowerCase() === 'pod');
+  let procNodes = nodes.filter(n => (n.type||'').toLowerCase() === 'process');
+  const fileNodes = nodes.filter(n => (n.type||'').toLowerCase() === 'file');
+  const netNodes = nodes.filter(n => (n.type||'').toLowerCase() === 'network');
+
+  // If no parent_process node exists but we have processes, synthesize or sort
+  const getProcWeight = (n) => {
+    const lbl = (n.label || n.name || n.binary || n.id || '').toLowerCase();
+    if (lbl.includes('parent')) return 0;
+    if (lbl.includes('sh') || lbl.includes('bash')) return 1;
+    if (lbl.includes('cat') || lbl.includes('grep')) return 2;
+    if (lbl.includes('wget') || lbl.includes('curl')) return 3;
+    return 4;
+  };
+  procNodes.sort((a,b) => getProcWeight(a) - getProcWeight(b));
+
+  const pos = {};
+  const procStartY = 45;
+  const procGap = 24;
+  const totalH = Math.max(460, procStartY + procNodes.length * (CH + procGap) + 40);
+  const W = 880;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${totalH}`);
+
+  // Pod position: vertically centered with the process stack
+  const procEndY = procStartY + Math.max(procNodes.length - 1, 0) * (CH + procGap);
+  const podY = Math.max(procStartY, (procStartY + procEndY) / 2);
+
+  podNodes.forEach(n => {
+    pos[n.id] = { x: colX.pod, y: podY };
+  });
+
+  // Process positions (Column 2)
+  procNodes.forEach((n, i) => {
+    pos[n.id] = { x: colX.process, y: procStartY + i * (CH + procGap) };
+  });
+
+  // Files & Network positions (Column 3)
+  if (fileNodes.length && netNodes.length) {
+    fileNodes.forEach((n, i) => {
+      pos[n.id] = { x: colX.file, y: procStartY + i * (CH + procGap) };
     });
+    netNodes.forEach((n, i) => {
+      pos[n.id] = { x: colX.network, y: Math.max(procStartY + 2 * (CH + procGap), procEndY) };
+    });
+  } else if (fileNodes.length) {
+    fileNodes.forEach((n, i) => {
+      pos[n.id] = { x: colX.file, y: procStartY + i * (CH + procGap) };
+    });
+  } else if (netNodes.length) {
+    netNodes.forEach((n, i) => {
+      pos[n.id] = { x: colX.network, y: procStartY + i * (CH + procGap) };
+    });
+  }
 
-    html +=
-        '</div>';
-
-    if (edges.length) {
-
-        html +=
-            '<div style="text-align:center;margin-top:16px;color:#8793a5;font-size:12px;font-weight:600;">' +
-            edges.length +
-            " Observed Relationship(s)" +
-            '</div>';
-
-        html +=
-            '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:12px;">';
-
-        edges.forEach(function(edge) {
-
-            const src =
-                edge.source_label ||
-                edge.source;
-
-            const tgt =
-                edge.target_label ||
-                edge.target;
-
-            const rel =
-                edge.label ||
-                edge.relationship ||
-                "RELATED";
-
-            html +=
-                '<div style="background:#0e131b;border:1px solid #202733;border-radius:6px;padding:6px 12px;font-size:12px;font-family:monospace;color:#b8c2d1;">' +
-                    '<span style="color:#e8edf5;font-weight:600;">' +
-                        escapeHtml(String(src)) +
-                    '</span> ' +
-                    '<span style="color:#35d07f;font-weight:600;">──[' +
-                        escapeHtml(String(rel)) +
-                    ']──►</span> ' +
-                    '<span style="color:#e8edf5;font-weight:600;">' +
-                        escapeHtml(String(tgt)) +
-                    '</span>' +
-                '</div>';
-
-        });
-
-        html +=
-            '</div>';
-
+  // Any unpositioned nodes
+  nodes.forEach(n => {
+    if (!pos[n.id]) {
+      pos[n.id] = { x: colX.process, y: procStartY };
     }
+  });
 
-    html +=
-        '</div>';
+  // Build SVG Content
+  let h = `
+    <defs>
+      <pattern id="grid-${svgId}" width="22" height="22" patternUnits="userSpaceOnUse">
+        <path d="M 22 0 L 0 0 0 22" fill="none" stroke="#101726" stroke-width="0.7"/>
+      </pattern>
+      <marker id="arr-red-${svgId}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#f43f5e" />
+      </marker>
+      <marker id="arr-gray-${svgId}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#475569" />
+      </marker>
+      <marker id="arr-sel-${svgId}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#00d4ff" />
+      </marker>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#grid-${svgId})" />
+  `;
 
-    graph.innerHTML = html;
+  // Draw smooth cubic Bezier edge curves
+  edges.forEach((e, idx) => {
+    const sp = pos[e.source];
+    const tp = pos[e.target];
+    if (!sp || !tp) return;
 
+    const x1 = sp.x + CW;
+    const y1 = sp.y + CH / 2;
+    const x2 = tp.x;
+    const y2 = tp.y + CH / 2;
+    const dx = Math.abs(x2 - x1) * 0.52;
+    const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+    const rel = (e.label || e.relationship || '').toUpperCase();
+    const isThreat = rel === 'READ' || rel === 'CONNECTED_TO' || rel === 'SPAWNED' || rel === 'RUNS';
+    const isSelected = selectedNodeId && (e.source === selectedNodeId || e.target === selectedNodeId);
+    const strokeColor = isSelected ? '#00d4ff' : (isThreat ? '#f43f5e' : '#475569');
+    const marker = isSelected ? `url(#arr-sel-${svgId})` : (isThreat ? `url(#arr-red-${svgId})` : `url(#arr-gray-${svgId})`);
+    const opacity = selectedNodeId ? (isSelected ? '1' : '0.12') : '0.85';
+    const strokeWidth = isSelected ? '2.4' : '1.7';
+
+    h += `<path id="edge-${svgId}-${idx}" d="${d}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-opacity="${opacity}" marker-end="${marker}"/>`;
+  });
+
+  // Draw Node Cards
+  const typeColors = {
+    pod: '#00d4ff',
+    process: '#a78bfa',
+    file: '#f59e0b',
+    network: '#f43f5e'
+  };
+
+  nodes.forEach(n => {
+    const p = pos[n.id];
+    if (!p) return;
+    const t = (n.type || 'process').toLowerCase();
+    const typeColor = typeColors[t] || '#a78bfa';
+    const typeLabel = t.toUpperCase();
+    let lbl = n.label || n.name || (n.id || '').split(':').pop() || '?';
+    if (lbl.startsWith('/bin/') || lbl.startsWith('/usr/bin/')) {
+      lbl = lbl.split('/').pop();
+    }
+    if (lbl.length > 18) lbl = lbl.slice(0, 16) + '…';
+
+    const isThreatNode = t === 'file' || t === 'network' || (t === 'process' && (lbl === 'cat' || lbl === 'wget' || lbl === 'parent_process'));
+    const isSelected = selectedNodeId === n.id;
+    const opacity = selectedNodeId ? (isSelected ? '1' : '0.35') : '1';
+    const borderColor = isSelected ? '#00d4ff' : (isThreatNode ? '#f43f5e' : '#1e293b');
+    const borderWidth = isSelected ? '2.2' : (isThreatNode ? '1.5' : '1.2');
+
+    h += `
+      <g style="cursor:pointer;opacity:${opacity};transition:all .15s ease" onclick="toggleSelectNode('${esc(n.id)}')">
+        <rect x="${p.x}" y="${p.y}" width="${CW}" height="${CH}" rx="${CR}" fill="#0d141f" stroke="${borderColor}" stroke-width="${borderWidth}"/>
+        ${isThreatNode ? `<circle cx="${p.x + CW - 16}" cy="${p.y + 16}" r="3.5" fill="#f43f5e"/>` : ''}
+        <text x="${p.x + 16}" y="${p.y + 27}" fill="#f1f5f9" font-family="'JetBrains Mono',monospace" font-size="12.5" font-weight="700">${esc(lbl)}</text>
+        <text x="${p.x + 16}" y="${p.y + 48}" fill="${typeColor}" font-family="'JetBrains Mono',monospace" font-size="10" font-weight="700" letter-spacing="1">${typeLabel}</text>
+      </g>
+    `;
+  });
+
+  svg.innerHTML = h;
 }
 
-
-async function updateGraph() {
-
-    try {
-
-        const response =
-            await fetch("/api/graph");
-
-        if (!response.ok) {
-            throw new Error("Graph request failed");
-        }
-
-        const data =
-            await response.json();
-
-        renderGraph(data);
-
-    } catch (error) {
-
-        console.error(
-            "Graph update error:",
-            error
-        );
-
-    }
-
+function toggleSelectNode(nodeId){
+  selectedNodeId = (selectedNodeId === nodeId ? null : nodeId);
+  pollGraph();
 }
 
-
-function renderEvents(events) {
-
-    const container =
-        document.getElementById("events");
-
-    if (!container) {
-        return;
-    }
-
-    if (!Array.isArray(events) || events.length === 0) {
-
-        container.innerHTML =
-            '<div class="empty">Waiting for telemetry...</div>';
-
-        return;
-
-    }
-
-    container.innerHTML =
-        events
-            .slice(-30)
-            .reverse()
-            .map(function(event) {
-
-                let text;
-
-                if (typeof event === "string") {
-
-                    text = event;
-
-                } else {
-
-                    try {
-
-                        text =
-                            JSON.stringify(
-                                event
-                            );
-
-                    } catch {
-
-                        text =
-                            String(event);
-
-                    }
-
-                }
-
-                return (
-                    '<div class="event">' +
-                    escapeHtml(text) +
-                    '</div>'
-                );
-
-            })
-            .join("");
-
+// ── simulation ───────────────────────────────────────────────────────────────
+let hist=[];
+async function runSim(sc){
+  const out=$('sim-out'),sb=$('sim-sb');
+  if(!out)return;
+  out.textContent='⏳ Running scenario: '+sc+' …\n';
+  if(sb)sb.textContent='running';
+  try{
+    const r=await fetch('/api/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario:sc})});
+    if(!r.ok){const e=await r.text();throw new Error('HTTP '+r.status+': '+e);}
+    const res=await r.json();
+    const ts=new Date().toISOString();
+    let txt=`[${ts}] Scenario: ${sc}\n${'─'.repeat(60)}\n`;
+    txt+=`Status          : ${res.status||'—'}\n`;
+    txt+=`Attack Type     : ${res.attack_type||'—'}\n`;
+    txt+=`Risk Score      : ${res.risk_score!==undefined?res.risk_score:'—'}\n`;
+    txt+=`Severity        : ${res.severity||'—'}\n`;
+    txt+=`Recommendation  : ${res.recommended_action||'—'}\n`;
+    txt+=`Safety Gate     : ${res.gate_approved===true?'✓ APPROVED':res.gate_approved===false?'✗ BLOCKED':'—'}\n`;
+    txt+=`Execution Mode  : ${res.execution_mode||'DRY_RUN'}\n`;
+    txt+=`Lifecycle State : ${res.lifecycle_state||'—'}\n`;
+    if(res.message)txt+=`\nNote: ${res.message}\n`;
+    out.textContent=txt;
+    if(sb)sb.textContent='completed';
+    hist.unshift({ts,sc,risk:res.risk_score,action:res.recommended_action,sev:res.severity});
+    renderHist();
+    setTimeout(pollState,300);setTimeout(pollGraph,400);
+  }catch(e){
+    out.textContent='✗ Error: '+e.message+'\n\nEnsure /api/simulate is available in the backend.';
+    if(sb)sb.textContent='error';
+  }
 }
-
-
-function escapeHtml(value) {
-
-    return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-
+function renderHist(){
+  const el=$('sim-hist');if(!el)return;
+  if(!hist.length){el.innerHTML='<div class="es"><span class="es-ic">📋</span><span class="es-tx">No runs yet</span></div>';return;}
+  el.innerHTML=hist.map(h=>`<div class="erow" style="align-items:center"><span class="ets">${esc(fts(h.ts))}</span><span class="ety" style="color:var(--cyan);width:160px">${esc(h.sc)}</span><span class="edet">Risk: ${h.risk??'—'} | ${h.sev??'—'} | ${h.action??'—'}</span></div>`).join('');
 }
+function clearHist(){hist=[];renderHist();}
 
-
-async function updateEvents() {
-
-    try {
-
-        const response =
-            await fetch("/api/events");
-
-        if (!response.ok) {
-            return;
-        }
-
-        const data =
-            await response.json();
-
-        renderEvents(
-            data.events ||
-            data ||
-            []
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Events update error:",
-            error
-        );
-
-    }
-
-}
-
-
-/*
- * Initial update
- */
-
-updateHealth();
-updateState();
-updateGraph();
-updateEvents();
-
-
-/*
- * Live polling
- */
-
-setInterval(
-    updateHealth,
-    5000
-);
-
-setInterval(
-    updateState,
-    1000
-);
-
-setInterval(
-    updateGraph,
-    1000
-);
-
-setInterval(
-    updateEvents,
-    1000
-);
-
+// ── init ─────────────────────────────────────────────────────────────────────
+pollHealth(); pollState(); pollGraph(); pollEvents();
+setInterval(pollHealth, 6000);
+setInterval(pollState, 1500);
+setInterval(pollGraph, 1500);
+setInterval(pollEvents, 1500);
 </script>
-
 </body>
 </html>
